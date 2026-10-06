@@ -1,0 +1,10 @@
+{
+  "spreadsheet_id": "offline-example",
+  "title": "SheetOpt example",
+  "sheets": ["Dados", "Dashboard"],
+  "formulas": [
+    {"sheet": "Dashboard", "row": 2, "column": 2, "a1": "Dashboard!B2", "formula": "=SUMIFS(Dados!F:F,Dados!A:A,A2)"},
+    {"sheet": "Dashboard", "row": 3, "column": 2, "a1": "Dashboard!B3", "formula": "=SUMIFS(Dados!F:F,Dados!A:A,A3)"},
+    {"sheet": "Dashboard", "row": 4, "column": 2, "a1": "Dashboard!B4", "formula": "=SUMIFS(Dados!F:F,Dados!A:A,A4)"}
+  ]
+}
