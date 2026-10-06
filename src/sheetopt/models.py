@@ -62,7 +62,7 @@ class AnalysisReport(BaseModel):
         snapshot: WorkbookSnapshot,
         patterns: list[FormulaPattern],
         findings: list[Finding],
-    ) -> "AnalysisReport":
+    ) -> AnalysisReport:
         counts: Counter[str] = Counter()
         for pattern in patterns:
             for fn in pattern.functions:

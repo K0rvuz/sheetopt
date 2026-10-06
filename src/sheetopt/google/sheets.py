@@ -59,8 +59,8 @@ def read_workbook(value: str) -> WorkbookSnapshot:
         )
         for sheet_name, value_range in zip(sheets, response.get("valueRanges", []), strict=False):
             for row_index, row in enumerate(value_range.get("values", []), start=1):
-                for column_index, value in enumerate(row, start=1):
-                    if isinstance(value, str) and value.startswith("="):
+                for column_index, cell_value in enumerate(row, start=1):
+                    if isinstance(cell_value, str) and cell_value.startswith("="):
                         a1 = f"{sheet_name}!{column_number_to_name(column_index)}{row_index}"
                         formulas.append(
                             FormulaCell(
@@ -68,7 +68,7 @@ def read_workbook(value: str) -> WorkbookSnapshot:
                                 row=row_index,
                                 column=column_index,
                                 a1=a1,
-                                formula=value,
+                                formula=cell_value,
                             )
                         )
 
