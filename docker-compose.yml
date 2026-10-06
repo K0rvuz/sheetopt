@@ -1,0 +1,9 @@
+services:
+  sheetopt:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SHEETOPT_GOOGLE_CREDENTIALS: /run/secrets/google-service-account.json
+    volumes:
+      - ./credentials/service-account.json:/run/secrets/google-service-account.json:ro
