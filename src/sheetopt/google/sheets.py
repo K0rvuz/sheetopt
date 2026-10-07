@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from googleapiclient.discovery import Resource
+
 from sheetopt.models import FormulaCell, WorkbookSnapshot
 
 _SPREADSHEET_ID_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")
@@ -30,12 +32,13 @@ def _quote_sheet(title: str) -> str:
     return "'" + title.replace("'", "''") + "'"
 
 
-def read_workbook(value: str) -> WorkbookSnapshot:
-    # Lazy import keeps the deterministic/offline core independent from Google SDK imports.
-    from sheetopt.google.auth import sheets_service
+def read_workbook(value: str, service: Resource | None = None) -> WorkbookSnapshot:
+    # Lazy import keeps the offline core independent from Google authentication.
+    if service is None:
+        from sheetopt.google.auth import sheets_service
 
+        service = sheets_service()
     spreadsheet_id = extract_spreadsheet_id(value)
-    service = sheets_service()
     metadata: dict[str, Any] = (
         service.spreadsheets()
         .get(spreadsheetId=spreadsheet_id, includeGridData=False)
@@ -71,10 +74,6 @@ def read_workbook(value: str) -> WorkbookSnapshot:
                                 formula=cell_value,
                             )
                         )
-
     return WorkbookSnapshot(
-        spreadsheet_id=spreadsheet_id,
-        title=title,
-        sheets=sheets,
-        formulas=formulas,
+        spreadsheet_id=spreadsheet_id, title=title, sheets=sheets, formulas=formulas
     )

@@ -5,6 +5,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     google_credentials: str | None = None
+    admin_token: str | None = None
+    encryption_key: str | None = None
+    data_dir: str = "/data"
     log_level: str = "INFO"
 
     model_config = SettingsConfigDict(
