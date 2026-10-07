@@ -16,3 +16,28 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check src tests
       - run: pytest -q
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cryptography
+      - run: docker build --tag sheetopt:ci .
+      - name: Test container startup and web UI
+        run: |
+          KEY="$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+          docker run -d --name sheetopt-smoke -p 127.0.0.1:18080:8080 \
+            -e SHEETOPT_ADMIN_TOKEN=local_ci_test_admin_token_long_enough_123456 \
+            -e "SHEETOPT_ENCRYPTION_KEY=$KEY" sheetopt:ci
+          trap 'docker logs sheetopt-smoke || true; docker rm -f sheetopt-smoke' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/health >/dev/null && \
+               curl -fsS http://127.0.0.1:18080/ | grep -q 'SheetOpt'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
