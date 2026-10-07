@@ -72,7 +72,7 @@ def test_ai_configuration_and_validation(monkeypatch, tmp_path):
 
 
 def test_clone_workflow_without_formulas(monkeypatch):
-    import sheetopt.workflow as workflow
+    from sheetopt import workflow
 
     monkeypatch.setattr(workflow, "credentials_from_info", lambda info: object())
     monkeypatch.setattr(workflow, "sheets_service", lambda credentials: object())
@@ -93,7 +93,7 @@ def test_clone_workflow_without_formulas(monkeypatch):
 
 
 def test_clone_workflow_with_formulas(monkeypatch):
-    import sheetopt.workflow as workflow
+    from sheetopt import workflow
 
     monkeypatch.setattr(workflow, "credentials_from_info", lambda info: object())
     monkeypatch.setattr(workflow, "sheets_service", lambda credentials: object())

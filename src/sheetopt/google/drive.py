@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from googleapiclient.discovery import Resource
@@ -8,7 +8,7 @@ from googleapiclient.discovery import Resource
 
 def clone_spreadsheet(drive: Resource, file_id: str, title: str) -> dict[str, Any]:
     """Copy the native spreadsheet, including formulas and formatting, via Drive."""
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     result = (
         drive.files()
         .copy(
