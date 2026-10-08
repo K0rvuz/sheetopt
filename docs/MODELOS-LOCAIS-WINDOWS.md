@@ -28,3 +28,34 @@ Use poucos milhares de tokens de contexto real, embora o modelo anuncie capacida
 
 ## Critérios de comparação
 Teste o mesmo diagnóstico e as mesmas fontes nas duas opções. Registre: tempo de resposta, sucesso de JSON válido, referências oficiais coerentes, quantidade de alucinações, relevância das 5 propostas e consistência de resultados em 3 execuções. **Não use a nota atribuída pelo próprio modelo como medição de qualidade.**
+
+## Diagnóstico de falhas do Qwen e saída estruturada
+
+O SheetOpt exige JSON validado. Uma resposta HTTP 200 pode mesmo assim
+terminar **sem proposta utilizável** quando o modelo atinge o limite de
+tokens ou gera JSON incompleto. A aplicação agora diferencia:
+- **Limite de tokens:** modelo interrompeu a resposta antes de completar o JSON.
+- **JSON inválido:** o texto recebido não pôde ser analisado.
+- **Estrutura inválida:** o JSON não respeita os campos do SheetOpt.
+- **Timeout ou conexão:** não houve resposta utilizável do Ollama.
+- **HTTP:** erro retornado pelo servidor do Ollama.
+
+O orçamento de resposta do provedor **local** é de 2.000 tokens, em vez de
+1.100. A janela mostrada em `ollama ps` é o contexto configurado no Ollama
+e não aumenta automaticamente ao alterar `max_tokens`; uma janela de 4.096
+tokens pode continuar restringindo consultas longas. Prefira selecionar uma
+aba, manter apenas amostras relevantes e revisar a prévia antes do envio.
+
+Para verificar se o Ollama está no ar sem expor dados confidenciais:
+
+```powershell
+ollama ps
+curl.exe http://localhost:11434/api/tags
+docker compose ps
+docker compose logs --tail=60 sheetopt
+```
+
+Não publique respostas cruas do modelo, tokens do administrador ou diagnósticos
+privados nos Issues do GitHub. O SheetOpt não armazena os corpos retornados
+pelo provedor nem inclui esse conteúdo em mensagens de erro. Nova tentativa
+exige prévia e autorização explícita; não existe retry automático.

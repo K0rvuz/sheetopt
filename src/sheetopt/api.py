@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from sheetopt import __version__
 from sheetopt.ai.packet import build_ai_packet
-from sheetopt.ai.provider import infer_suggestions
+from sheetopt.ai.provider import AIProviderError, infer_suggestions
 from sheetopt.context.engine import build_report_context
 from sheetopt.context.formula_samples import read_formula_examples
 from sheetopt.evidence.trials import list_trials, outcome_summary, record_trial
@@ -399,6 +399,14 @@ def ai_context_suggestions(data: AIContextRequest) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail="Configure a local or external AI provider first.")
     try:
         suggestions = infer_suggestions(config, packet)
+    except AIProviderError as exc:
+        # A stable reason code lets users distinguish truncated JSON from
+        # connection failures without revealing potentially private AI output.
+        logger.warning("AI suggestion failed with category: %s", exc.code)
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc),
+        ) from exc
     except (ValueError, TypeError, KeyError) as exc:
         # Never expose provider bodies, API keys, user data or internal request URLs.
         logger.warning("AI suggestion request failed: %s", type(exc).__name__)
