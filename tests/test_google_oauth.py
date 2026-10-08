@@ -189,7 +189,14 @@ def test_oauth_credentials_in_analysis_are_used(monkeypatch, tmp_path):
         assert credentials is creds
         assert google_info is None
         assert make_clone is True
-        return {"ok": True}
+        return {
+            "report": AnalysisReport(
+                spreadsheet_id="test", title="Data", sheet_count=1, formula_count=0,
+                pattern_count=0, function_counts={}, findings=[],
+            ),
+            "clone": None,
+            "status": "no_formulas",
+        }
 
     monkeypatch.setattr(api, "inspect_and_clone", fake_inspection)
     result = client.post(
@@ -198,7 +205,7 @@ def test_oauth_credentials_in_analysis_are_used(monkeypatch, tmp_path):
         headers=headers,
     )
     assert result.status_code == 200
-    assert result.json() == {"ok": True}
+    assert result.json()["report"]["formula_count"] == 0
 
 
 def test_expired_oauth_state(monkeypatch, tmp_path):
