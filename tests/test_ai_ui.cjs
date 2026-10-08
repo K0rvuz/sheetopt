@@ -291,7 +291,7 @@ test("formula evidence requires separate Google read and model opt-ins", async (
     requests.push({url, body: JSON.parse(options.body)});
     if (url === "/v1/ai/formula-samples") {
       return {ok: true, json: async () => ({
-        examples: [{a1: "C3", formula_template: "=SUMIFS(A:A;B:B;\\"<TEXT>\\")"}],
+        examples: [{a1: "C3", formula_template: '=SUMIFS(A:A;B:B;"<TEXT>")'}],
         sent_to_ai: false, writes_performed: false
       })};
     }
