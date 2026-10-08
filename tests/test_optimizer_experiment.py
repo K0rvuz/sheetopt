@@ -10,7 +10,6 @@ from sheetopt.optimizer import validate
 from sheetopt.optimizer.let_cache import find_candidates, propose_let_cache
 from sheetopt.secrets_store import put_secret
 
-
 FORMULA = '=SUMIFS(VENDAS!$A:$A,VENDAS!$C:$C,"OK")+SUMIFS(VENDAS!$A:$A,VENDAS!$C:$C,"OK")'
 
 
