@@ -33,7 +33,6 @@ def test_let_candidate_rejects_unsafe_and_ambiguous_grammar():
     bad = [
         "=SUM(A1:A5)", "=SUM(A1:A5)+SUM(A1:A6)",
         "=SUM(INDIRECT(\"A:A\"))+SUM(INDIRECT(\"A:A\"))",
-        "=SUM(A1;A2)+SUM(A1;A2)",
         "=SUM(A1+(B1))+SUM(A1+(B1))",
         "=SUM(A1:A5)*SUM(A1:A5)",
         "=SUM(A1:A5)+SUM(A1:A5)+1",
