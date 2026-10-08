@@ -428,6 +428,13 @@ def validate_optimization_candidate(request: ValidateCandidateRequest) -> dict[s
         return result
     except (HttpError, TimeoutError, OSError, RuntimeError, ValueError, KeyError) as exc:
         logger.warning("Clone-only optimization encountered %s", type(exc).__name__)
+        try:
+            record_trial(
+                clone_id=request.clone_id, candidate_id=request.candidate_id,
+                rule_id=match["rule_id"], result={"status": "request_failed_unknown"},
+            )
+        except (sqlite3.Error, HTTPException, OSError, ValueError):
+            logger.warning("Could not preserve inconclusive optimization trial evidence")
         # A write timeout can have an unknown outcome: never retry automatically.
         raise HTTPException(
             status_code=502,

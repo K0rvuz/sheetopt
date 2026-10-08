@@ -136,7 +136,7 @@ def infer_suggestions(
             )},
         ],
         "temperature": 0.1,
-        "max_tokens": 1600,
+        "max_tokens": 1600 if config.get("provider") != "local" else 1100,
     }
     if config.get("provider") == "local":
         # Local Ollama supports JSON mode and low-overhead output.
@@ -146,7 +146,10 @@ def infer_suggestions(
     # response bodies/URLs/tokens in error details or logs.
     try:
         with httpx.Client(
-            timeout=httpx.Timeout(65, connect=8), follow_redirects=False, trust_env=False
+            timeout=httpx.Timeout(
+                300 if config.get("provider") == "local" else 65, connect=8
+            ),
+            follow_redirects=False, trust_env=False
         ) as client:
             response = client.post(url, json=body, headers=headers)
             if response.status_code != 200:
