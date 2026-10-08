@@ -7,9 +7,9 @@ from typing import Any, Literal
 from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from googleapiclient.errors import HttpError
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from sheetopt import __version__
 from sheetopt.google.auth import credentials_from_info
@@ -24,6 +24,7 @@ from sheetopt.google.oauth import (
 )
 from sheetopt.google.sheets import extract_spreadsheet_id
 from sheetopt.models import AnalysisReport
+from sheetopt.reports.pdf import build_report_pdf
 from sheetopt.secrets_store import get_secret, put_secret
 from sheetopt.security import require_admin
 from sheetopt.workflow import inspect_and_clone
@@ -62,6 +63,23 @@ class GoogleSettings(BaseModel):
 
 class GoogleOAuthClient(BaseModel):
     client_config: dict[str, Any]
+
+
+class ReportExportRequest(BaseModel):
+    # The browser sends only the existing diagnostic. No Google API calls.
+    report: AnalysisReport
+    status: str = Field(default="diagnosed", max_length=80)
+    events: list[dict[str, Any]] = Field(default_factory=list, max_length=15)
+
+    @model_validator(mode="after")
+    def limit_report_size(self) -> ReportExportRequest:
+        if len(self.report.findings) > 1500:
+            raise ValueError("Too many findings for a single PDF.")
+        if len(self.report.model_dump_json()) > 4_000_000:
+            raise ValueError("PDF report exceeds the supported export size.")
+        if len(self.report.title) > 500:
+            raise ValueError("Invalid document title.")
+        return self
 
 
 @app.get("/")
@@ -182,6 +200,22 @@ def configure_ai(data: AISettings) -> dict[str, str]:
         raise HTTPException(status_code=422, detail="External AI requires HTTPS.")
     put_secret("ai", data.model_dump())
     return {"status": "saved", "provider": data.provider}
+
+
+@app.post("/v1/reports/pdf", dependencies=[Depends(require_admin)])
+def export_report_pdf(payload: ReportExportRequest) -> Response:
+    pdf_bytes = build_report_pdf(
+        payload.report, status=payload.status, events=payload.events
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="sheetopt-diagnostico.pdf"',
+            "Cache-Control": "no-store, private",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @app.post("/v1/analyze", response_model=AnalysisReport, dependencies=[Depends(require_admin)])
