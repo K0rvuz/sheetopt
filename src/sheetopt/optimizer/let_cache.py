@@ -2,7 +2,7 @@
 
 This is intentionally NOT a general formula rewriter. It only matches the
 entire formula `=FUNCTION(args) + FUNCTION(args)` and refuses nested calls,
-locale-specific separators and potentially volatile expressions.
+ambiguous syntax and potentially volatile expressions.
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from sheetopt.models import FormulaCell
 
 _AGGREGATES = {"SUM", "SUMIF", "SUMIFS", "COUNTIF", "COUNTIFS", "AVERAGEIF", "AVERAGEIFS"}
 _DISALLOWED = re.compile(r"(?i)\b(?:INDIRECT|OFFSET|RAND|RANDBETWEEN|NOW|TODAY|IMPORTDATA|IMPORTRANGE|GOOGLEFINANCE|QUERY|LET)\s*\(")
-_SIMPLE_TOKEN = re.compile(r"^[A-Za-z0-9_.$!:'\" ,()=<>*/+\-]+$")
+_SIMPLE_TOKEN = re.compile(r"^[A-Za-z0-9_.$!:'\" ,();=<>*/+\-]+$")
 _FUNCTION = re.compile(r"^=\s*([A-Za-z]+)\s*\(")
 
 
@@ -67,8 +67,15 @@ def propose_let_cache(formula: str, cell_address: str = "") -> str | None:
     """Return a scalar LET rewrite, or None if the grammar is not unambiguous."""
     if len(formula) > 1800 or len(formula) < 12 or _DISALLOWED.search(formula):
         return None
-    if not _SIMPLE_TOKEN.fullmatch(formula) or ";" in formula or "{" in formula:
+    if not _SIMPLE_TOKEN.fullmatch(formula) or "{" in formula:
         return None
+    # Reject mixed argument separators (outside quoted string literals).
+    outside_literals = re.sub(r'"(?:[^"]|"")*"', "", formula)
+    has_semicolon = ";" in outside_literals
+    has_comma = "," in outside_literals
+    if has_semicolon and has_comma:
+        return None
+    delimiter = ";" if has_semicolon else ","
     parsed = _balanced_call(formula)
     if not parsed:
         return None
@@ -85,7 +92,7 @@ def propose_let_cache(formula: str, cell_address: str = "") -> str | None:
     digest = hashlib.sha256((cell_address + "\0" + formula).encode("utf-8")).hexdigest()[:14]
     identifier = f"sheetoptcache{digest}"
     # Preserve the *same* addition operation (no multiplication or rounding change).
-    return f"=LET({identifier},{aggregate},{identifier}+{identifier})"
+    return f"=LET({identifier}{delimiter}{aggregate}{delimiter}{identifier}+{identifier})"
 
 
 def find_candidates(formulas: list[FormulaCell], limit: int = 5) -> list[dict[str, str]]:

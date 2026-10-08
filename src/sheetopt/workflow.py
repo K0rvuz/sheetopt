@@ -8,6 +8,7 @@ from sheetopt.analysis.analyzer import analyze_snapshot
 from sheetopt.google.auth import credentials_from_info, drive_service, sheets_service
 from sheetopt.google.drive import clone_spreadsheet
 from sheetopt.google.sheets import read_workbook
+from sheetopt.optimizer.aggregation_planner import plan_aggregations
 from sheetopt.optimizer.let_cache import find_candidates
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ def inspect_and_clone(
         "merge_available": False,
         "events": events,
         "optimization_candidates": [],
+        "aggregation_opportunities": plan_aggregations(report),
     }
     # Avoid creating unnecessary Drive copies of formula-free workbooks.
     if make_clone and snapshot.formulas:

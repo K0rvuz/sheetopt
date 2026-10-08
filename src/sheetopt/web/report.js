@@ -205,6 +205,67 @@
     root.append(panel);
   }
 
+  function renderAggregationPlanning(root, result) {
+    const suggestions = result.aggregation_opportunities || [];
+    const panel = $node("details", null, "report-details");
+    panel.append($node("summary",
+      "Plano de agregações compartilhadas (QUERY) · " + quantity(suggestions.length)
+    ));
+    panel.append($node("p",
+      "O SheetOpt agrupou padrões semelhantes de SUMIFS por aba de origem, " +
+      "coluna somada e colunas de critérios. São propostas arquiteturais para revisão — " +
+      "não são fórmulas validadas nem mudanças aplicáveis nesta versão.",
+      "muted"
+    ));
+    if (!suggestions.length) {
+      panel.append($node("p",
+        "Nenhum agrupamento elegível foi reconhecido nos alertas PERF-002 do diagnóstico. " +
+        "Isso não significa que a planilha não possa ser otimizada.",
+        "muted"
+      ));
+      root.append(panel);
+      return;
+    }
+    const list = $node("div", null, "review-opportunities");
+    for (const suggestion of suggestions) {
+      const card = $node("details", null, "report-group");
+      const summary = $node("summary");
+      summary.append(
+        $node("strong", suggestion.source_sheet + " · soma de " +
+          suggestion.measure_column + " por " + suggestion.group_columns.join(", ")),
+        $node("span", quantity(suggestion.estimated_pattern_occurrences) +
+          " ocorrências estimadas", "pill")
+      );
+      card.append(summary);
+      const contents = $node("div", null, "report-group-body");
+      contents.append($node("p",
+        "Padrões identificados: " + quantity(suggestion.pattern_count) +
+        ". A contagem pode se sobrepor entre grupos, não equivale ao número " +
+        "de células que seriam corrigidas e não mede ganho de performance.",
+        "muted"
+      ));
+      contents.append($node("p", suggestion.explanation, "muted"));
+      contents.append($node("pre", suggestion.query_shape, "formula-diff"));
+      if (Array.isArray(suggestion.example_cells) && suggestion.example_cells.length) {
+        contents.append($node("p",
+          "Exemplos: " + suggestion.example_cells.join(", "), "finding-locations"
+        ));
+      }
+      const checks = $node("details", null, "finding-extra");
+      checks.append($node("summary", "Condições que precisam ser validadas"));
+      const ul = $node("ul");
+      for (const requirement of suggestion.requires_validation || []) {
+        ul.append($node("li", requirement));
+      }
+      checks.append(ul);
+      contents.append(checks);
+      card.append(contents);
+      list.append(card);
+    }
+    panel.append(list);
+    root.append(panel);
+  }
+
   function renderCandidates(root, result, token) {
     const candidates = result.optimization_candidates || [];
     if (!result.clone) return;
@@ -372,7 +433,8 @@
         report,
         status: result.status || "diagnosed",
         events: result.events || [],
-        clone: result.clone || null
+        clone: result.clone || null,
+        aggregation_opportunities: result.aggregation_opportunities || []
       }, null, 2);
       downloadBlob("sheetopt-diagnostico.json",
         new Blob([json], {type: "application/json;charset=utf-8"}));
@@ -419,6 +481,7 @@
     root.append(detail);
     renderCandidates(root, result, token);
     renderPerf003Review(root, report);
+    renderAggregationPlanning(root, result);
     root.scrollIntoView({behavior: "smooth", block: "start"});
   }
   window.SheetOptReports = { renderReport };

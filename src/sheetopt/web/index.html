@@ -47,6 +47,15 @@
             <button type="submit">Analisar e criar cópia</button>
             <button id="diagnose-only" type="button" class="secondary">Somente diagnosticar (sem cópia)</button>
           </form>
+          <details class="report-timeline">
+            <summary>Já tenho um diagnóstico JSON salvo</summary>
+            <p>Reabra um diagnóstico anterior e gere propostas de consolidação sem acessar o Google.</p>
+            <form id="import-report-form">
+              <label for="report-json-file">Arquivo sheetopt-diagnostico.json</label>
+              <input id="report-json-file" type="file" accept=".json,application/json" required>
+              <button type="submit" class="secondary">Importar e preparar propostas</button>
+            </form>
+          </details>
           <div id="results" hidden class="results" aria-live="polite"></div>
         </section>
         <section id="google" class="panel">

@@ -152,3 +152,20 @@ frequency estimates are based on normalized patterns, not benchmark results.
 The rule no longer counts occurrences appearing only inside double-quoted
 formula text. Editing A:A to a fixed-height range may silently drop new rows;
 no range-limiting change is currently authorized.
+
+
+## Aggregation consolidation planning from real SUMIFS patterns
+
+The read-only optimizer planner groups the normalized patterns of PERF-002
+by source sheet, aggregated measure column, and criteria columns. For each
+group, it provides an SQL-like QUERY *shape*, estimated occurrences (which
+can overlap across groups), examples and requirements to validate before
+a rewrite. These shapes are **not executable formulas**; a practical QUERY
+requires real data-type and wildcard semantics, a dependency graph, and
+benchmark/equivalence checks. The planner never changes Google Sheets.
+It works both with a new diagnosis and with **Importar diagnóstico JSON**
+(previous SheetOpt export), without any new Google API call.
+
+Experimental OPT-LET-001 can also recognize the semicolon argument delimiter
+used by many spreadsheet locales for a very narrow repeated-function case.
+This does not make mixed-locale, nested or multi-SUMIFS rewrites safe.

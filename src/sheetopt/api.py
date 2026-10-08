@@ -24,6 +24,7 @@ from sheetopt.google.oauth import (
 )
 from sheetopt.google.sheets import extract_spreadsheet_id
 from sheetopt.models import AnalysisReport
+from sheetopt.optimizer.aggregation_planner import plan_aggregations
 from sheetopt.optimizer.validate import test_candidate_on_clone
 from sheetopt.reports.pdf import build_report_pdf
 from sheetopt.secrets_store import get_secret, put_secret
@@ -228,6 +229,18 @@ def export_report_pdf(payload: ReportExportRequest) -> Response:
 def analyze(request: AnalyzeRequest) -> AnalysisReport:
     response = _analyze(request, clone=False)
     return response["report"]
+
+
+@app.post("/v1/optimizations/plan", dependencies=[Depends(require_admin)])
+def plan_from_existing_report(payload: ReportExportRequest) -> dict[str, Any]:
+    """Plan offline from an exported diagnosis, without accessing Google."""
+    return {"aggregation_opportunities": plan_aggregations(payload.report)}
+
+
+@app.post("/v1/workbooks/plan", dependencies=[Depends(require_admin)])
+def plan_workbook(request: AnalyzeRequest) -> dict[str, Any]:
+    """Read and plan; do not clone or change any Google Sheets cells."""
+    return _analyze(request, clone=False)
 
 
 @app.post("/v1/optimizations/test", dependencies=[Depends(require_admin)])

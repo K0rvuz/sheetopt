@@ -181,11 +181,43 @@ $("diagnose-only").addEventListener("click", async () => {
   try {
     toggleBusy(form, true);
     notice("Analisando fórmulas sem criar outra cópia...");
-    const report = await request("/v1/analyze", "POST", {
+    const result = await request("/v1/workbooks/plan", "POST", {
       spreadsheet_url: $("spreadsheet").value.trim()
     });
-    showReport({ report, status: "diagnosed_only", clone: null });
+    showReport({ ...result, status: "diagnosed_only", clone: null });
     notice("Diagnóstico concluído. Nenhuma cópia foi criada.");
+  } catch (err) { notice(err.message); }
+  finally { toggleBusy(form, false); }
+});
+
+$("import-report-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    toggleBusy(form, true);
+    const file = $("report-json-file").files[0];
+    if (!file || file.size > 4 * 1024 * 1024) {
+      throw new Error("Selecione um relatório JSON de até 4 MB.");
+    }
+    const parsed = JSON.parse(await file.text());
+    if (!parsed || typeof parsed !== "object" || !parsed.report ||
+        !Array.isArray(parsed.report.findings)) {
+      throw new Error("O arquivo não contém um diagnóstico SheetOpt válido.");
+    }
+    notice("Preparando plano de agregações a partir do diagnóstico salvo...");
+    const planning = await request("/v1/optimizations/plan", "POST", {
+      report: parsed.report, status: "diagnosed_only"
+    });
+    showReport({
+      report: parsed.report,
+      status: "diagnosed_only",
+      clone: null,
+      events: Array.isArray(parsed.events) ? parsed.events : [],
+      optimization_candidates: [],
+      aggregation_opportunities: planning.aggregation_opportunities || []
+    });
+    $("report-json-file").value = "";
+    notice("Plano preparado a partir do JSON. Nenhuma planilha foi acessada ou alterada.");
   } catch (err) { notice(err.message); }
   finally { toggleBusy(form, false); }
 });
