@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     admin_token: str | None = None
     encryption_key: str | None = None
     data_dir: str = "/data"
+    public_base_url: str = "http://localhost:8080"
     log_level: str = "INFO"
 
     model_config = SettingsConfigDict(

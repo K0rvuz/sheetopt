@@ -39,7 +39,7 @@
         </div>
         <section id="analyze" class="panel">
           <div class="heading"><div><span class="eyebrow">01 / ANÁLISE</span><h2>Selecionar planilha</h2></div><span class="pill">Cópia protegida</span></div>
-          <p>Informe a URL de uma planilha do Google Sheets compartilhada com a conta configurada.</p>
+          <p>Informe a URL de uma planilha acessível à conta Google conectada ou à Service Account selecionada.</p>
           <form id="analyze-form">
             <label for="spreadsheet">Link ou ID da planilha</label>
             <input id="spreadsheet" required maxlength="2048" placeholder="https://docs.google.com/spreadsheets/d/.../edit">
@@ -49,12 +49,28 @@
         </section>
         <section id="google" class="panel">
           <div class="heading"><div><span class="eyebrow">02 / CONEXÃO</span><h2>Credenciais Google</h2></div></div>
-          <p>Nesta etapa, use uma Service Account. Ative Google Sheets API e Google Drive API e compartilhe a planilha com o e-mail da conta de serviço.</p>
-          <p class="warning">A clonagem com Service Account pode depender de um Shared Drive ou de uma conta com capacidade de armazenamento. OAuth do próprio usuário está no roadmap.</p>
+          <h3>Minha conta Google (OAuth 2.0)</h3>
+          <p>Use o JSON OAuth baixado do Google Cloud Console (tipo Aplicativo da Web ou Desktop). Depois autorize a conta em uma janela Google.</p>
+          <p class="warning">Para clientes Web, cadastre <code>http://localhost:8080/auth/google/callback</code> nos URIs de redirecionamento autorizados do Google Cloud (ou use o endereço configurado no servidor). Para Desktop, o SheetOpt usa o retorno local em 127.0.0.1.</p>
+          <form id="google-oauth-form">
+            <label for="google-oauth-file">Arquivo JSON OAuth (client_secret_*.json)</label>
+            <input id="google-oauth-file" type="file" accept=".json,application/json" required>
+            <button type="submit" class="secondary">Salvar cliente OAuth</button>
+          </form>
+          <p id="oauth-redirect" class="muted"></p>
+          <div class="oauth-controls">
+            <button id="google-connect" type="button">Conectar com Google</button>
+            <button id="google-refresh" type="button" class="secondary">Atualizar status</button>
+            <button id="google-disconnect" type="button" class="secondary">Desconectar</button>
+          </div>
+          <p id="oauth-status" class="muted">Nenhuma conta conectada.</p>
+          <hr>
+          <h3>Alternativa: Service Account</h3>
+          <p>Se preferir uma automação por conta de serviço, ative Google Sheets API e Google Drive API e compartilhe a planilha com o e-mail dessa conta.</p>
           <form id="google-form">
             <label for="google-file">Arquivo JSON da Service Account</label>
             <input id="google-file" type="file" accept=".json,application/json" required>
-            <button type="submit" class="secondary">Salvar credenciais criptografadas</button>
+            <button type="submit" class="secondary">Salvar credenciais da Service Account</button>
           </form>
           <p id="google-email" class="muted"></p>
         </section>

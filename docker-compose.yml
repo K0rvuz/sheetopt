@@ -7,6 +7,7 @@ services:
       SHEETOPT_ADMIN_TOKEN: ${SHEETOPT_ADMIN_TOKEN:?Set a 32+ character admin token in .env}
       SHEETOPT_ENCRYPTION_KEY: ${SHEETOPT_ENCRYPTION_KEY:?Set a Fernet key in .env}
       SHEETOPT_DATA_DIR: /data
+      SHEETOPT_PUBLIC_BASE_URL: ${SHEETOPT_PUBLIC_BASE_URL:-http://localhost:8080}
     volumes:
       - sheetopt_data:/data
     restart: unless-stopped

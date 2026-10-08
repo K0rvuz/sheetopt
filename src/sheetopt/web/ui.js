@@ -15,8 +15,17 @@ async function request(path, method = "GET", body) {
 }
 async function refresh() {
   const data = await request("/v1/settings");
-  $("google-status").textContent = data.google.configured ? "Configurado" : "Não configurado";
+  $("google-status").textContent = data.google.oauth_connected && data.google.mode === "oauth"
+    ? "OAuth conectado" : data.google.mode === "service_account" ? "Service Account" : "Não configurado";
   $("google-email").textContent = data.google.email || "";
+  $("google-connect").disabled = !data.google.oauth_client_configured;
+  $("google-disconnect").disabled = !data.google.oauth_connected;
+  $("oauth-status").textContent = data.google.oauth_connected
+    ? "Conta conectada · método ativo: OAuth 2.0"
+    : data.google.oauth_client_configured ? "Cliente OAuth salvo; clique em Conectar com Google."
+    : "Carregue seu arquivo OAuth primeiro.";
+  $("oauth-redirect").textContent = data.google.oauth_redirect_uri
+    ? "URI de retorno: " + data.google.oauth_redirect_uri : "";
   $("ai-status").textContent = data.ai.provider === "disabled" ? "Desativada" : data.ai.provider;
   $("ai-provider").value = data.ai.provider || "disabled";
   $("ai-endpoint").value = data.ai.endpoint || "";
@@ -124,4 +133,57 @@ $("analyze-form").addEventListener("submit", async (event) => {
     notice("Diagnóstico concluído. A planilha original não foi modificada.");
   } catch (err) { notice(err.message); }
   finally { toggleBusy(form, false); }
+});
+
+$("google-oauth-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    toggleBusy(form, true);
+    const file = $("google-oauth-file").files[0];
+    if (!file || file.size > 1024 * 1024) throw new Error("Selecione um JSON de até 1 MB.");
+    const parsed = JSON.parse(await file.text());
+    await request("/v1/settings/google/oauth-client", "PUT", { client_config: parsed });
+    $("google-oauth-file").value = "";
+    await refresh();
+    notice("Cliente OAuth salvo. Clique em Conectar com Google.");
+  } catch (err) { notice(err.message); }
+  finally { toggleBusy(form, false); }
+});
+$("google-connect").addEventListener("click", async () => {
+  const popup = window.open("about:blank", "sheetopt_google_oauth", "width=580,height=720");
+  if (!popup) { notice("Permita pop-ups para conectar com Google."); return; }
+  try {
+    const result = await request("/v1/google/oauth/start", "POST");
+    popup.location.replace(result.authorization_url);
+    notice("Conclua a autorização na janela Google. O status será atualizado automaticamente.");
+    let attempts = 0;
+    const timer = window.setInterval(async () => {
+      if (++attempts > 90) { window.clearInterval(timer); return; }
+      try {
+        await refresh();
+        if ($("oauth-status").textContent.includes("Conta conectada")) {
+          window.clearInterval(timer);
+          notice("Google conectado! Já pode analisar suas planilhas.");
+        } else if (popup.closed) {
+          window.clearInterval(timer);
+        }
+      } catch (_) { /* Keep pending until the next status check. */ }
+    }, 2000);
+  } catch (err) {
+    popup.close();
+    notice(err.message);
+  }
+});
+$("google-refresh").addEventListener("click", async () => {
+  try { await refresh(); notice("Status da conexão atualizado."); }
+  catch (err) { notice(err.message); }
+});
+$("google-disconnect").addEventListener("click", async () => {
+  if (!window.confirm("Desconectar a conta Google desta instalação do SheetOpt?")) return;
+  try {
+    await request("/v1/settings/google/oauth", "DELETE");
+    await refresh();
+    notice("Tokens OAuth apagados da instalação. Você também pode revogar o acesso na sua Conta Google.");
+  } catch (err) { notice(err.message); }
 });

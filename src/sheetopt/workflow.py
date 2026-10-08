@@ -10,12 +10,16 @@ from sheetopt.google.sheets import read_workbook
 
 def inspect_and_clone(
     spreadsheet_url: str,
-    google_info: dict[str, Any],
+    google_info: dict[str, Any] | None,
     *,
     make_clone: bool = True,
+    credentials: Any | None = None,
 ) -> dict[str, Any]:
     """Read and diagnose. Never rewrite formulas or touch original spreadsheet."""
-    credentials = credentials_from_info(google_info)
+    if credentials is None:
+        if google_info is None:
+            raise ValueError("Google credentials are not configured.")
+        credentials = credentials_from_info(google_info)
     snapshot = read_workbook(spreadsheet_url, service=sheets_service(credentials))
     report = analyze_snapshot(snapshot)
     result: dict[str, Any] = {
