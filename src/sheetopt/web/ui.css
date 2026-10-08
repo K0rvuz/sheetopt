@@ -120,3 +120,17 @@
   .ai-progress.is-running .ai-spinner{animation:none}
   .ai-progress.is-running .ai-progress-fill{animation:none;width:100%;opacity:.55}
 }
+
+/* Complete AI analysis download controls */
+.ai-export{
+  margin-top:18px;
+  padding:16px;
+  background:#102633;
+  border:1px solid #36556a;
+  border-radius:11px;
+}
+.ai-export>h4{margin:0 0 7px;color:#e7f4fd;font-size:14px}
+.ai-export>p{margin:0 0 12px;max-width:740px}
+.ai-export .ai-action-row{margin-bottom:0}
+.ai-export .ai-action-row button{border:1px solid #487187;background:#1b3d4b}
+.ai-export .ai-action-row button:hover:not(:disabled){background:#265367}

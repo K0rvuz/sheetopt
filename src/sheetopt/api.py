@@ -33,6 +33,7 @@ from sheetopt.knowledge.retrieval import all_documents, search_knowledge
 from sheetopt.models import AnalysisReport
 from sheetopt.optimizer.aggregation_planner import plan_aggregations
 from sheetopt.optimizer.validate import test_candidate_on_clone
+from sheetopt.reports.ai_pdf import AIAnalysisExport, build_ai_analysis_pdf
 from sheetopt.reports.pdf import build_report_pdf
 from sheetopt.secrets_store import get_secret, put_secret
 from sheetopt.security import require_admin
@@ -346,6 +347,21 @@ def ai_context_suggestions(data: AIContextRequest) -> dict[str, Any]:
         "performance_measured": False,
         "caveat": "These proposals are hypotheses, not validated transformations.",
     }
+
+
+@app.post("/v1/reports/ai/pdf", dependencies=[Depends(require_admin)])
+def export_ai_analysis_pdf(payload: AIAnalysisExport) -> Response:
+    """Render an existing reviewed AI response; never call AI or Google."""
+    data = build_ai_analysis_pdf(payload)
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="sheetopt-analise-ia.pdf"',
+            "Cache-Control": "no-store, private",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @app.post("/v1/reports/pdf", dependencies=[Depends(require_admin)])

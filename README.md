@@ -255,3 +255,12 @@ Para instalar Ollama em uma máquina de 32 GB RAM / GPU 4 GB veja:
 [Modelos locais e passos Windows](docs/MODELOS-LOCAIS-WINDOWS.md).
 **Modelo inicial sugerido:** `qwen3.5:4b`, sujeito a validação de desempenho
 real. Nenhuma fonte, configuração ou benchmark exige conta do desenvolvedor.
+
+## Exportar propostas da IA em JSON e PDF
+
+Após uma inferência concluída, a tela oferece **Exportar JSON completo**
+e **Exportar PDF completo**. Ambos apresentam todas as propostas, riscos,
+verificações exigidas, dúvidas, documentação citada e o contexto revisado
+que foi enviado ao modelo, sem segredos ou conteúdo bruto da planilha.
+O PDF é gerado localmente sem repetir a chamada ao modelo. Consulte
+[o guia de exportação](docs/EXPORTACAO-ANALISE-IA.md).

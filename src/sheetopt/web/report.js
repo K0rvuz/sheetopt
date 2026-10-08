@@ -291,6 +291,8 @@
     consentStep.append(resultArea);
 
     let previewHash = null;
+    let approvedPacket = null;
+    let previewDestination = "";
     let previewReady = false;
     let busy = false;
     let timer = null;
@@ -348,6 +350,8 @@
     };
     const reset = () => {
       previewHash = null;
+      approvedPacket = null;
+      previewDestination = "";
       previewReady = false;
       consent.checked = false;
       consent.disabled = true;
@@ -429,6 +433,8 @@
       try {
         const data = await post("/v1/ai/preview", packetRequest());
         previewHash = data.preview_hash;
+        approvedPacket = data.packet;
+        previewDestination = data.destination || "";
         previewReady = data.ready === true;
         renderPayload(data, data.ready
           ? "Prévia pronta. Confira o pacote e o destino antes de autorizar."
@@ -462,6 +468,8 @@
     runButton.addEventListener("click", async () => {
       if (busy || !consent.checked || !previewHash || !previewReady) return;
       const approvedHash = previewHash;
+      const sentPacket = approvedPacket;
+      const destination = previewDestination;
       resultArea.replaceChildren();
       setBusy(true, "Consultando o modelo...",
         "O Ollama está preparando uma resposta. Modelos locais podem " +
@@ -508,6 +516,77 @@
           "Sugestões não verificadas. Desempenho não medido; merge indisponível.",
           "warning"
         ));
+        // A complete review-only export is constructed from the exact approved
+        // context packet and the structured response, not from HTML summaries.
+        const record = {
+          schema_version: 1,
+          generated_at: new Date().toISOString(),
+          provider: data.provider,
+          model: data.model,
+          destination,
+          diagnostic: {
+            sheet_count: result.report.sheet_count,
+            formula_count: result.report.formula_count,
+            pattern_count: result.report.pattern_count
+          },
+          context_packet: sentPacket,
+          context_sha256: approvedHash,
+          inference_elapsed_seconds: Math.round((Date.now() - started) / 100) / 10,
+          analysis: data.result,
+          status: "unverified_suggestions",
+          writes_performed: false,
+          performance_measured: false,
+          merge_available: false
+        };
+        const exportPanel = $node("section", null, "ai-export");
+        exportPanel.append($node("h4", "Baixar análise completa"));
+        exportPanel.append($node("p",
+          "Inclui todas as propostas, riscos, verificações, dúvidas, fontes e " +
+          "o contexto enviado ao modelo. Nenhuma otimização foi validada.",
+          "muted"
+        ));
+        const buttons = $node("div", null, "ai-action-row");
+        addButton(buttons, "Exportar JSON completo", () => {
+          const blob = new Blob([JSON.stringify(record, null, 2)], {
+            type: "application/json;charset=utf-8"
+          });
+          downloadBlob("sheetopt-analise-ia.json", blob);
+        }, "secondary");
+        const pdfButton = addButton(buttons, "Exportar PDF completo", async () => {
+          pdfButton.disabled = true;
+          pdfButton.textContent = "Preparando PDF...";
+          try {
+            const response = await fetch("/v1/reports/ai/pdf", {
+              method: "POST",
+              headers: {
+                "Authorization": "Bearer " + token,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify(record),
+              cache: "no-store"
+            });
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(typeof errorData.detail === "string"
+                ? errorData.detail
+                : "Falha ao gerar o PDF (HTTP " + response.status + ").");
+            }
+            const blob = await response.blob();
+            if (blob.type !== "application/pdf") {
+              throw new Error("O servidor não retornou um PDF válido.");
+            }
+            downloadBlob("sheetopt-analise-ia.pdf", blob);
+          } catch (error) {
+            exportPanel.append($node("p",
+              "Erro na exportação: " + error.message, "warning"
+            ));
+          } finally {
+            pdfButton.disabled = false;
+            pdfButton.textContent = "Exportar PDF completo";
+          }
+        }, "secondary");
+        exportPanel.append(buttons);
+        resultArea.append(exportPanel);
         showCompletion("Análise concluída");
       } catch (error) {
         resultArea.replaceChildren($node("p",
