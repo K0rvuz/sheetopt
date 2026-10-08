@@ -18,6 +18,68 @@ from sheetopt.models import AnalysisReport
 from sheetopt.optimizer.aggregation_planner import plan_aggregations
 
 MAX_PACKET_CHARS = 16000
+LOCAL_FRIENDLY_PACKET_CHARS = 4600
+
+
+def _packet_chars(packet: dict[str, Any]) -> int:
+    return len(json.dumps(packet, ensure_ascii=False))
+
+
+def _compact_packet(packet: dict[str, Any]) -> dict[str, Any]:
+    """Bound the *actual previewed* packet for small 4K-context local models.
+
+    Prioritize user-approved formula evidence over global, repeated summaries.
+    The preview hash is generated after this operation, so no unseen data is
+    transmitted and no model input is silently different from the preview.
+    A character budget is only a heuristic, NOT a token counter.
+    """
+    packet["context_compacted"] = False
+    if _packet_chars(packet) <= LOCAL_FRIENDLY_PACKET_CHARS:
+        return packet
+    packet["context_compacted"] = True
+    packet["limits"].append(
+        "Some lower-priority metadata is condensed to fit a small local context; "
+        "the shown packet is the exact inference context."
+    )
+    packet["cross_sheet_edges"] = packet["cross_sheet_edges"][:8]
+    packet["hotspots"] = packet["hotspots"][:5]
+    packet["aggregation_review_candidates"] = packet["aggregation_review_candidates"][:4]
+    packet["functions"] = dict(list(packet["functions"].items())[:8])
+
+    if _packet_chars(packet) > LOCAL_FRIENDLY_PACKET_CHARS:
+        for doc in packet["knowledge_sources"]:
+            if len(doc.get("guidance", "")) > 210:
+                doc["guidance"] = doc["guidance"][:207] + "..."
+        packet["cross_sheet_edges"] = packet["cross_sheet_edges"][:5]
+        packet["hotspots"] = packet["hotspots"][:4]
+        packet["aggregation_review_candidates"] = packet["aggregation_review_candidates"][:3]
+
+    if _packet_chars(packet) > LOCAL_FRIENDLY_PACKET_CHARS:
+        for sample in packet["sampled_formula_examples"]:
+            shape = sample["formula_shape"]
+            if len(shape) > 225:
+                sample["formula_shape"] = shape[:225]
+                sample["shape_truncated"] = True
+        packet["cross_sheet_edges"] = packet["cross_sheet_edges"][:4]
+        packet["aggregation_review_candidates"] = packet["aggregation_review_candidates"][:2]
+        packet["functions"] = dict(list(packet["functions"].items())[:6])
+
+    if _packet_chars(packet) > LOCAL_FRIENDLY_PACKET_CHARS:
+        samples = packet["sampled_formula_examples"]
+        packet["sampled_formula_examples"] = samples[:4]
+        packet["samples_omitted_due_to_context"] = len(samples) - len(
+            packet["sampled_formula_examples"]
+        )
+        packet["sample_count"] = len(packet["sampled_formula_examples"])
+        packet["cross_sheet_edges"] = packet["cross_sheet_edges"][:2]
+        packet["hotspots"] = packet["hotspots"][:3]
+        packet["aggregation_review_candidates"] = packet["aggregation_review_candidates"][:1]
+
+    if _packet_chars(packet) > LOCAL_FRIENDLY_PACKET_CHARS:
+        # Never silently send unreviewed metadata or claim full coverage.
+        raise ValueError("Compact AI context still too large; select a narrower scope.")
+    return packet
+
 
 
 def _safe_count(value: Any, upper_bound: int) -> int:
@@ -194,4 +256,4 @@ def build_ai_packet(
     }
     if len(json.dumps(packet, ensure_ascii=False)) > MAX_PACKET_CHARS:
         raise ValueError("Context packet exceeds the size limit; narrow the focus.")
-    return packet
+    return _compact_packet(packet)

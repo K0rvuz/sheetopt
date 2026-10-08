@@ -200,3 +200,53 @@ def test_sample_added_after_preview_requires_a_new_hash(monkeypatch, tmp_path):
     req["consent"] = True
     req["preview_hash"] = old_hash
     assert client.post("/v1/ai/suggest", json=req, headers=headers).status_code == 409
+
+def test_compact_packet_prioritizes_real_examples_over_repeated_summaries():
+    import json
+
+    from sheetopt.ai.packet import LOCAL_FRIENDLY_PACKET_CHARS, build_ai_packet
+
+    report = _report()
+    context = _context()
+    context["edges"] = [
+        {"from_sheet": "Sales Dashboard", "depends_on_sheet": "Other",
+         "formula_cells": 100 + i}
+        for i in range(32)
+    ]
+    context["hotspots"] = [
+        {"reference": "Other!A:A", "estimated_occurrences": 12000 + i}
+        for i in range(30)
+    ]
+    samples = []
+    shape = "=SUMIFS(A:A;B:B;\"<TEXT>\")" * 15
+    for i in range(6):
+        samples.append({
+            "sheet": "Sales Dashboard", "a1": f"C{i + 3}",
+            "formula_template": shape,
+        })
+    packet = build_ai_packet(
+        report, context=context, focus_sheet="Sales Dashboard",
+        formula_samples=samples,
+        opportunities=[{
+            "source_sheet": "Other",
+            "measure_column": "A", "group_columns": ["B", "C", "D"],
+            "estimated_pattern_occurrences": 12500,
+        }] * 8,
+    )
+    encoded = json.dumps(packet, ensure_ascii=False)
+    assert len(encoded) <= LOCAL_FRIENDLY_PACKET_CHARS
+    assert packet["context_compacted"] is True
+    assert packet["sample_count"] >= 1
+    assert packet["transmission_policy"]["redacted_formula_shapes_included"] is True
+    assert "Sales Dashboard" not in encoded
+    assert packet["functions_scope"] == "whole_workbook_only_not_selected_sheet"
+    assert any("sanitizada" in item or "redacted" in item for item in packet["limits"])
+
+
+def test_small_packet_is_not_compacted_unnecessarily():
+    from sheetopt.ai.packet import build_ai_packet
+
+    packet = build_ai_packet(_report(), context=_context(),
+                             focus_sheet="Sales Dashboard", opportunities=[])
+    assert packet["context_compacted"] is False
+    assert packet["sample_count"] == 0

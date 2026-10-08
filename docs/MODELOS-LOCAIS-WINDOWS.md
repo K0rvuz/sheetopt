@@ -59,3 +59,35 @@ Não publique respostas cruas do modelo, tokens do administrador ou diagnóstico
 privados nos Issues do GitHub. O SheetOpt não armazena os corpos retornados
 pelo provedor nem inclui esse conteúdo em mensagens de erro. Nova tentativa
 exige prévia e autorização explícita; não existe retry automático.
+
+## Evitar respostas cortadas após incluir amostras de fórmulas
+
+Com o `qwen3.5:4b`, o SheetOpt separa:
+- **Contexto local (num_ctx):** tamanho total de entrada e saída que o modelo comporta. `ollama ps` mostra a janela carregada (frequentemente 4096).
+- **Limite de resposta (max_tokens):** número máximo de tokens gerados; aumentar apenas isso NÃO amplia `num_ctx`.
+- **Prévia compactada:** o SheetOpt limita o pacote realmente transmitido a aproximadamente 4.600 caracteres, priorizando os exemplos de fórmulas sanitizadas e resumindo resumos globais menos relevantes. **Caracteres não são tokens** e o limite é uma mitigação, não uma garantia.
+
+Primeiro atualize o SheetOpt e tente novamente. Para problemas persistentes e
+testes que incluam mais amostras, use uma variante local com contexto de **8.192
+tokens**, sem baixar os pesos outra vez:
+
+```powershell
+@'
+FROM qwen3.5:4b
+PARAMETER num_ctx 8192
+'@ | Set-Content -Encoding ascii -Path .\Modelfile.sheetopt
+ollama create qwen3.5-sheetopt:8k -f .\Modelfile.sheetopt
+ollama run qwen3.5-sheetopt:8k
+```
+
+Saia do modo de conversa com `/bye` e execute `ollama ps` enquanto o
+modelo ainda estiver carregado. No SheetOpt altere **Modelo** para
+`qwen3.5-sheetopt:8k`, mantendo a URL `http://host.docker.internal:11434/v1`.
+O Ollama documenta a personalização de contexto via Modelfile para a API
+OpenAI-compatible. O aumento do cache KV pode consumir mais VRAM, ocasionar
+CPU offload e reduzir velocidade na RTX 3050 de 4 GB. Se isso acontecer,
+volte ao `qwen3.5:4b` e use escopos menores; não é necessário recriar
+a planilha nem instalar o Ollama novamente.
+
+Fontes oficiais: https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx
+e https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx

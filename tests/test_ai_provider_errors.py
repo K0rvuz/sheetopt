@@ -150,6 +150,6 @@ def test_sheetopt_api_returns_actionable_safe_message(monkeypatch, tmp_path):
     result = client.post("/v1/ai/suggest", json=payload, headers=headers)
     assert result.status_code == 502
     detail = result.json()["detail"]
-    assert "limite de tokens" in detail
+    assert "limite de geração" in detail
     assert "private-id" not in detail
     assert "Private Sheet" not in detail
