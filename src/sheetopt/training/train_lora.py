@@ -5,6 +5,9 @@ Use Unsloth Qwen3.5 4B bf16 LoRA. This is real gradient training, not RAG.
 """
 from __future__ import annotations
 
+# Unsloth has an import-order requirement in GPU training environments.
+# ruff: noqa: I001
+
 import argparse
 import json
 from pathlib import Path
@@ -50,9 +53,10 @@ def main() -> None:
         parser.error("Training requires both explicit GPU and source-license approval.")
 
     try:
+        # Unsloth must patch model kernels before TRL imports transformers.
+        from unsloth import FastLanguageModel  # noqa: I001
         import torch
         from datasets import load_dataset
-        from unsloth import FastLanguageModel
         from trl import SFTConfig, SFTTrainer
     except ImportError as exc:
         raise SystemExit(
