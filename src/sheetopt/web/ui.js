@@ -61,8 +61,10 @@ function showReport(data) {
   const report = data.report;
   line("h3", report.title, node);
   line("p", report.sheet_count + " abas · " + report.formula_count + " fórmulas · " + report.pattern_count + " padrões · " + report.findings.length + " alertas", node);
-  if (data.status === "no_formulas") {
-    line("p", "Nenhuma fórmula encontrada. Não foi criada cópia; esta etapa não executa otimizações estruturais.", node);
+  if (data.status === "no_formulas" || (data.status === "diagnosed_only" && !report.formula_count)) {
+    line("p", "Nenhuma fórmula encontrada. Esta etapa não executa otimizações estruturais.", node);
+  } else if (data.status === "diagnosed_only") {
+    line("p", "Diagnóstico somente leitura concluído; nenhuma nova cópia foi criada.", node);
   } else if (data.clone) {
     line("p", "Diagnóstico concluído. Cópia criada, sem alterações nas fórmulas.", node);
     const a = line("a", "Abrir cópia de trabalho ↗", node);
@@ -199,4 +201,19 @@ $("google-disconnect").addEventListener("click", async () => {
     await refresh();
     notice("Tokens OAuth apagados da instalação. Você também pode revogar o acesso na sua Conta Google.");
   } catch (err) { notice(err.message); }
+});
+
+$("diagnose-only").addEventListener("click", async () => {
+  const form = $("analyze-form");
+  if (!$("spreadsheet").reportValidity()) return;
+  try {
+    toggleBusy(form, true);
+    notice("Analisando fórmulas sem criar outra cópia...");
+    const report = await request("/v1/analyze", "POST", {
+      spreadsheet_url: $("spreadsheet").value.trim()
+    });
+    showReport({ report, status: "diagnosed_only", clone: null });
+    notice("Diagnóstico concluído. Nenhuma cópia foi criada.");
+  } catch (err) { notice(err.message); }
+  finally { toggleBusy(form, false); }
 });

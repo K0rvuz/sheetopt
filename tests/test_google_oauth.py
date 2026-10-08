@@ -261,3 +261,31 @@ def test_analysis_returns_report_when_oauth_token_persistence_fails(
     assert response.json()["clone"]["id"] == "copy-id"
     assert "RuntimeError" in caplog.text
     assert "secret-containing-internal-failure" not in caplog.text
+
+
+def test_read_only_diagnostic_does_not_clone(monkeypatch, tmp_path):
+    client, headers = _setup(monkeypatch, tmp_path)
+    from sheetopt.secrets_store import put_secret
+
+    put_secret("google_auth_mode", {"mode": "oauth"})
+    monkeypatch.setattr(api, "oauth_credentials", lambda: object())
+    monkeypatch.setattr(api, "persist_oauth_credentials", lambda creds: None)
+
+    def no_clone(link, google_info, *, credentials, make_clone):
+        assert make_clone is False
+        return {
+            "report": AnalysisReport(
+                spreadsheet_id="test", title="Data", sheet_count=1,
+                formula_count=10, pattern_count=2, function_counts={"SUM": 10},
+                findings=[],
+            ),
+            "clone": None, "status": "diagnosed",
+        }
+
+    monkeypatch.setattr(api, "inspect_and_clone", no_clone)
+    response = client.post(
+        "/v1/analyze", headers=headers,
+        json={"spreadsheet_url": "https://docs.google.com/spreadsheets/d/" + "a" * 26 + "/edit"},
+    )
+    assert response.status_code == 200
+    assert response.json()["formula_count"] == 10
