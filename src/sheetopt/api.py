@@ -17,6 +17,8 @@ from sheetopt import __version__
 from sheetopt.ai.packet import build_ai_packet
 from sheetopt.ai.provider import infer_suggestions
 from sheetopt.context.engine import build_report_context
+from sheetopt.evidence.trials import list_trials, outcome_summary, record_trial
+from sheetopt.knowledge.retrieval import all_documents, search_knowledge
 from sheetopt.google.auth import credentials_from_info, sheets_service
 from sheetopt.google.oauth import (
     complete_oauth,
@@ -74,6 +76,7 @@ class AIContextRequest(BaseModel):
     context: dict[str, Any] | None = None
     opportunities: list[dict[str, Any]] | None = Field(default=None, max_length=30)
     focus_sheet: str | None = Field(default=None, max_length=160)
+    investigation: Literal["overview", "upstream", "downstream", "hotspots"] = "overview"
     include_identifiers: bool = False
     consent: bool = False
     preview_hash: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
@@ -94,6 +97,7 @@ def _ai_packet(data: AIContextRequest) -> dict[str, Any]:
             opportunities=data.opportunities,
             focus_sheet=data.focus_sheet,
             include_identifiers=data.include_identifiers,
+            investigation=data.investigation,
         )
     except (ValueError, TypeError, KeyError, AttributeError) as exc:
         raise HTTPException(
@@ -251,6 +255,44 @@ def configure_ai(data: AISettings) -> dict[str, str]:
     return {"status": "saved", "provider": data.provider}
 
 
+@app.get("/v1/knowledge", dependencies=[Depends(require_admin)])
+def knowledge_index() -> dict[str, Any]:
+    """Local, versioned reference catalog. No network access."""
+    return {"sources": [
+        {"source_id": doc["id"], "title": doc["title"], "url": doc["url"]}
+        for doc in all_documents()
+    ], "source_type": "curated_official_documentation"}
+
+
+class KnowledgeSearch(BaseModel):
+    query: str = Field(min_length=2, max_length=300)
+
+
+@app.post("/v1/knowledge/search", dependencies=[Depends(require_admin)])
+def knowledge_search(payload: KnowledgeSearch) -> dict[str, Any]:
+    return {"results": search_knowledge(payload.query)}
+
+
+@app.post("/v1/ai/investigate", dependencies=[Depends(require_admin)])
+def investigate_existing_context(data: AIContextRequest) -> dict[str, Any]:
+    """Return relevant existing metadata for human review; no Google or AI call."""
+    packet = _ai_packet(data)
+    return {
+        "packet": packet, "preview_hash": _packet_digest(packet),
+        "sources": packet["knowledge_sources"],
+        "sent": False, "coverage": packet["coverage"],
+        "writes_performed": False,
+    }
+
+
+@app.get("/v1/evidence/trials", dependencies=[Depends(require_admin)])
+def evidence_history(limit: int = 50) -> dict[str, Any]:
+    if not 1 <= limit <= 100:
+        raise HTTPException(status_code=422, detail="Invalid evidence page size.")
+    records = list_trials(limit=limit)
+    return {"records": records, "summary": outcome_summary(records)}
+
+
 @app.post("/v1/ai/preview", dependencies=[Depends(require_admin)])
 def ai_context_preview(data: AIContextRequest) -> dict[str, Any]:
     """Inspect the exact bounded payload locally; no provider is called."""
@@ -376,6 +418,13 @@ def validate_optimization_candidate(request: ValidateCandidateRequest) -> dict[s
             clone_id=request.clone_id,
             candidate=match,
         )
+        try:
+            record_trial(
+                clone_id=request.clone_id, candidate_id=request.candidate_id,
+                rule_id=match["rule_id"], result=result,
+            )
+        except (sqlite3.Error, HTTPException, OSError, ValueError):
+            logger.warning("Could not write sanitized optimization trial evidence")
         return result
     except (HttpError, TimeoutError, OSError, RuntimeError, ValueError, KeyError) as exc:
         logger.warning("Clone-only optimization encountered %s", type(exc).__name__)

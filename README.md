@@ -238,3 +238,20 @@ To use an Ollama instance hosted on the Windows machine from Docker, expose
 its compatible API to the Docker network and configure an address resolvable
 from the container (commonly `host.docker.internal`). Do not make such a
 service publicly accessible without authentication.
+
+## 3 pilares da IA especializada (implementação incremental)
+
+A base de documentação Google Sheets está em `src/sheetopt/knowledge/sources.json`
+com recuperação lexical offline, IDs e links oficiais. O motor de contexto
+permite investigar relações upstream/downstream por aba e hotspots sem
+consultar Google ou IA. O registro local criptografado acompanha resultados
+reais do teste experimental do validador, **sem** afirmar aceleração.
+
+Guia geral: [Arquitetura de IA](docs/ARQUITETURA-IA.md). Implementações:
+[1. Conhecimento/RAG](docs/01-CONHECIMENTO-RAG.md),
+[2. Investigação contextual](docs/02-INVESTIGACAO-CONTEXTUAL.md),
+[3. Evidência e benchmarks](docs/03-EVIDENCIAS-E-BENCHMARK.md).
+Para instalar Ollama em uma máquina de 32 GB RAM / GPU 4 GB veja:
+[Modelos locais e passos Windows](docs/MODELOS-LOCAIS-WINDOWS.md).
+**Modelo inicial sugerido:** `qwen3.5:4b`, sujeito a validação de desempenho
+real. Nenhuma fonte, configuração ou benchmark exige conta do desenvolvedor.

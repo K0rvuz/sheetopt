@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "source_policy": "Curated human-authored guidance with official Google URLs. Not a complete mirror or live crawl.",
+  "updated_utc": "2026-10-08",
+  "documents": [
+    {
+      "id": "SHEETS-PERF-001",
+      "title": "Dependências e subexpressões compartilhadas",
+      "category": "performance",
+      "keywords": [
+        "dependencia",
+        "dependencias",
+        "chain",
+        "sumifs",
+        "countifs",
+        "repeticao",
+        "helper",
+        "calculo",
+        "agregacao"
+      ],
+      "url": "https://support.google.com/docs/answer/11468464?hl=en",
+      "guidance": "Mudanças em uma célula podem provocar recálculos nas dependentes. Reutilizar cálculos comuns por células auxiliares pode diminuir trabalho repetido; funções voláteis TODAY, NOW e RAND devem ser usadas com parcimônia. Não equivale a prova de ganho, que precisa ser medido."
+    },
+    {
+      "id": "SHEETS-PERF-002",
+      "title": "Intervalos abertos, voláteis e cadeias longas",
+      "category": "performance",
+      "keywords": [
+        "A:A",
+        "coluna",
+        "colunas",
+        "intervalo",
+        "aberto",
+        "full-column",
+        "now",
+        "today",
+        "rand",
+        "volatile",
+        "range"
+      ],
+      "url": "https://support.google.com/docs/answer/12159115?hl=en",
+      "guidance": "Referências a colunas inteiras podem ler mais linhas do que o necessário. Intervalos fechados podem acelerar cálculos, mas truncar intervalos sem uma política para novas linhas pode alterar resultados futuros. Centralizar funções voláteis pode reduzir dependências."
+    },
+    {
+      "id": "SHEETS-FUNC-LET",
+      "title": "LET: avaliação única de expressão",
+      "category": "function",
+      "keywords": [
+        "let",
+        "cache",
+        "subexpressao",
+        "memoizacao",
+        "repetida"
+      ],
+      "url": "https://support.google.com/docs/answer/13190535?hl=pt-BR",
+      "guidance": "LET define nomes e calcula cada expressão atribuída uma única vez no escopo da função. Reescritas devem preservar tipos, erros, volatilidade e resultados em teste na cópia. Não garantir que a fórmula ficou mais rápida só pela sintaxe."
+    },
+    {
+      "id": "SHEETS-FUNC-QUERY",
+      "title": "QUERY: agrupamento e tipos mistos",
+      "category": "function",
+      "keywords": [
+        "query",
+        "group",
+        "group by",
+        "agregacao",
+        "sumifs",
+        "tabela",
+        "pivot",
+        "tipos"
+      ],
+      "url": "https://support.google.com/docs/answer/3093343?hl=pt-BR",
+      "guidance": "QUERY permite agregações e group by, porém a coluna usa o tipo majoritário: valores de tipos minoritários são tratados como nulos. O parâmetro de cabeçalhos afeta interpretação. Não trocar SUMIFS por QUERY automaticamente sem testar semântica de critérios, nulos, erros e datas."
+    },
+    {
+      "id": "SHEETS-FUNC-SUMIFS",
+      "title": "SUMIFS: critérios por linha e semântica",
+      "category": "function",
+      "keywords": [
+        "sumifs",
+        "soma.se.s",
+        "criterios",
+        "comparacao",
+        "wildcard",
+        "texto",
+        "data",
+        "busca"
+      ],
+      "url": "https://support.google.com/docs/answer/3238496?hl=pt",
+      "guidance": "SUMIFS soma somente linhas que satisfazem todos os critérios. Converter para agregação única requer testar vários critérios, data/hora, textos, colunas com nulos, curingas e desigualdades. A distribuição de dados pode impedir substituição por QUERY equivalente."
+    },
+    {
+      "id": "SHEETS-FUNC-SUMIF",
+      "title": "SUMIF: curingas e operadores comparativos",
+      "category": "function",
+      "keywords": [
+        "sumif",
+        "sumifs",
+        "curinga",
+        "wildcard",
+        "*",
+        "?",
+        "criterio",
+        "operador"
+      ],
+      "url": "https://support.google.com/docs/answer/3093583?hl=pt-BR",
+      "guidance": "Critérios de texto podem incluir curingas * e ? e escapes com ~; critérios numéricos podem conter operadores como >, < e =. Uma tabela pré-agregada por igualdade simples pode alterar correspondências especiais de critérios."
+    },
+    {
+      "id": "SHEETS-API-VALUES",
+      "title": "Sheets API: ler e gravar valores",
+      "category": "api",
+      "keywords": [
+        "api",
+        "batchget",
+        "batchupdate",
+        "read",
+        "write",
+        "valor",
+        "formula",
+        "user_entered"
+      ],
+      "url": "https://developers.google.com/workspace/sheets/api/guides/values",
+      "guidance": "A API separa valores formatados, fórmulas e valores interpretados. Leituras e atualizações em lotes evitam solicitações individuais. Comparar saída exige considerar effectiveValue, formattedValue e fórmulas originais, sem confundir latência HTTP com latência de recálculo."
+    },
+    {
+      "id": "SHEETS-API-BATCH",
+      "title": "Sheets API: atualizações estruturais em lote",
+      "category": "api",
+      "keywords": [
+        "batchupdate",
+        "merge",
+        "formatacao",
+        "estrutura",
+        "dependencia",
+        "protected",
+        "copy"
+      ],
+      "url": "https://developers.google.com/workspace/sheets/api/guides/batchupdate",
+      "guidance": "spreadsheets.batchUpdate suporta alterações estruturais, formatação e regras protegidas. A operação em lote tem propriedades de atomicidade, mas não substitui verificação de equivalência nem reconciliação de edições concorrentes antes de um merge."
+    }
+  ]
+}

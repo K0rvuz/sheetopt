@@ -13,6 +13,7 @@ from typing import Any
 from sheetopt.context.engine import build_report_context, select_context_packet
 from sheetopt.models import AnalysisReport
 from sheetopt.optimizer.aggregation_planner import plan_aggregations
+from sheetopt.knowledge.retrieval import knowledge_for_diagnostic
 
 MAX_PACKET_CHARS = 16000
 
@@ -31,12 +32,30 @@ def build_ai_packet(
     opportunities: list[dict[str, Any]] | None = None,
     focus_sheet: str | None = None,
     include_identifiers: bool = False,
+    investigation: str = "overview",
 ) -> dict[str, Any]:
     """Build a compact, auditable packet without raw formulas or row data."""
     provided = context if isinstance(context, dict) else build_report_context(report)
     if provided.get("coverage") not in ("formula_snapshot", "diagnostic_only"):
         raise ValueError("Unsupported context coverage.")
+    if investigation not in ("overview", "upstream", "downstream", "hotspots"):
+        raise ValueError("Invalid investigation direction.")
+    if investigation in ("upstream", "downstream") and not focus_sheet:
+        raise ValueError("Choose a sheet for directional investigation.")
     selected = select_context_packet(provided, sheet_name=focus_sheet)
+    if investigation == "upstream":
+        selected["edges"] = [
+            edge for edge in selected["edges"]
+            if edge.get("from_sheet") == focus_sheet
+        ]
+    elif investigation == "downstream":
+        selected["edges"] = [
+            edge for edge in selected["edges"]
+            if edge.get("depends_on_sheet") == focus_sheet
+        ]
+    elif investigation == "hotspots":
+        selected["edges"] = []
+
     labels: dict[str, str] = {}
 
     def alias(name: Any) -> str:
@@ -118,7 +137,10 @@ def build_ai_packet(
 
     # Only rule labels and counts; no normalized formulas or findings messages.
     counts = Counter(f.rule_id for f in report.findings)
+    sources = knowledge_for_diagnostic(report.function_counts, dict(counts), focus=focus_sheet)
     packet: dict[str, Any] = {
+        "investigation": investigation,
+        "knowledge_sources": sources,
         "packet_version": 1,
         "coverage": selected["coverage"],
         "focus_sheet": alias(focus_sheet) if focus_sheet else None,

@@ -178,6 +178,19 @@
       focus.append(opt);
     }
     controls.append(focus);
+    const investigation = $node("select");
+    investigation.setAttribute("aria-label", "Tipo de investigação contextual");
+    for (const [value, label] of [
+      ["overview", "Panorama geral"],
+      ["upstream", "Fontes consultadas pela aba"],
+      ["downstream", "Abas dependentes"],
+      ["hotspots", "Intervalos críticos"]
+    ]) {
+      const option = $node("option", label);
+      option.value = value;
+      investigation.append(option);
+    }
+    controls.append(investigation);
     panel.append(controls);
 
     const labels = $node("label", null, "ai-check");
@@ -226,10 +239,55 @@
         details.append($node("summary", "Inspecionar JSON exato do contexto"));
         details.append($node("pre", JSON.stringify(data.packet, null, 2), "formula-diff"));
         previewInfo.append(details);
+      const references = (data.packet?.knowledge_sources || []);
+      if (references.length) {
+        const citations = $node("details", null, "finding-extra");
+        citations.append($node("summary", "Documentação oficial recuperada · " + references.length));
+        for (const source of references) {
+          const link = $node("a", source.source_id + " — " + source.title);
+          link.href = source.source_url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          citations.append(link, $node("p", source.guidance, "muted"));
+        }
+        previewInfo.append(citations);
+      }
       } catch (error) {
         previewInfo.append($node("p", error.message, "warning"));
       } finally {
         previewButton.disabled = false;
+      }
+    });
+
+    const probe = addButton(panel, "Investigar contexto local (sem IA)", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const response = await fetch("/v1/ai/investigate", {
+          method: "POST",
+          headers: {"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+          body: JSON.stringify(packetRequest()),
+          cache: "no-store"
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(
+          typeof data.detail === "string" ? data.detail : "Investigação indisponível."
+        );
+        previewInfo.replaceChildren(
+          $node("p", "Contexto investigado localmente. Nenhuma IA ou Google API foi chamada.", "muted")
+        );
+        const details = $node("details", null, "finding-extra");
+        details.open = true;
+        details.append($node("summary", "Ver contexto e referências oficiais"));
+        details.append($node("pre", JSON.stringify(data.packet, null, 2), "formula-diff"));
+        previewInfo.append(details);
+        previewHash = null;
+        consent.checked = false;
+        runButton.disabled = true;
+      } catch (error) {
+        previewInfo.replaceChildren($node("p", error.message, "warning"));
+      } finally {
+        button.disabled = false;
       }
     });
 
@@ -253,6 +311,7 @@
       ));
     };
     focus.addEventListener("change", reset);
+    investigation.addEventListener("change", reset);
     includeNames.addEventListener("change", reset);
     consent.addEventListener("change", () => {
       runButton.disabled = !(consent.checked && previewHash);
@@ -262,6 +321,7 @@
       context: result.context || null,
       opportunities: result.aggregation_opportunities || [],
       focus_sheet: focus.value || null,
+      investigation: investigation.value,
       include_identifiers: includeNames.checked,
     });
 
@@ -334,6 +394,46 @@
     });
     runButton.disabled = true;
     panel.append(resultArea);
+    root.append(panel);
+  }
+
+  function renderEvidenceHistory(root, token) {
+    const panel = $node("details", null, "report-details");
+    panel.append($node("summary", "Histórico local de testes e evidências"));
+    panel.append($node("p",
+      "Mostra apenas testes efetuados pelo validador do SheetOpt. " +
+      "A versão atual NÃO mede tempo de recálculo nem comprova ganhos globais.",
+      "muted"
+    ));
+    const target = $node("div");
+    addButton(panel, "Consultar histórico local", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const response = await fetch("/v1/evidence/trials?limit=30", {
+          headers: {"Authorization": "Bearer " + token}, cache: "no-store"
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error("Histórico indisponível.");
+        target.replaceChildren(
+          $node("p",
+            quantity(data.summary.trial_count) + " teste(s) registrados; " +
+            "ganhos de desempenho medidos: 0.", "muted")
+        );
+        for (const trial of data.records || []) {
+          target.append($node("p",
+            trial.rule_id + " · " + trial.status + " · " +
+            new Date(trial.timestamp * 1000).toLocaleString("pt-BR"),
+            "muted"
+          ));
+        }
+      } catch (error) {
+        target.replaceChildren($node("p", error.message, "warning"));
+      } finally {
+        button.disabled = false;
+      }
+    });
+    panel.append(target);
     root.append(panel);
   }
 
@@ -752,6 +852,7 @@
     renderCandidates(root, result, token);
     renderWorkbookContext(root, result);
     renderAiAssistant(root, result, token);
+    renderEvidenceHistory(root, token);
     renderPerf003Review(root, report);
     renderAggregationPlanning(root, result);
     root.scrollIntoView({behavior: "smooth", block: "start"});
