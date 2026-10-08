@@ -99,9 +99,9 @@ def sanitise_formula(formula: str) -> str:
         )
         part = _NUMBER.sub("<NUMBER>", part)
 
-        def name(match: re.Match[str]) -> str:
+        def name(match: re.Match[str], source: str = part) -> str:
             word = match.group()
-            suffix = part[match.end():].lstrip()
+            suffix = source[match.end():].lstrip()
             if word in {"REF_SHEET", "TEXT", "NUMBER", "IDENTIFIER"}:
                 return word
             if word.upper() in _ALLOWED_FUNCTIONS and suffix.startswith("("):

@@ -288,7 +288,7 @@ class FormulaSampleRequest(BaseModel):
         if len(self.report.model_dump_json()) > 1_200_000:
             raise ValueError("Diagnostic too large for a targeted formula read.")
         if not isinstance(self.context.get("sheets"), list):
-            raise ValueError("A complete sheet context is required.")
+            raise TypeError("A complete sheet context is required.")
         if self.context.get("coverage") != "formula_snapshot":
             raise ValueError("Read-only formula sampling requires a live diagnostic context.")
         if self.focus_sheet not in [
