@@ -12,7 +12,7 @@ from googleapiclient.errors import HttpError
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from sheetopt import __version__
-from sheetopt.google.auth import credentials_from_info
+from sheetopt.google.auth import credentials_from_info, sheets_service
 from sheetopt.google.oauth import (
     complete_oauth,
     disconnect_oauth,
@@ -23,9 +23,8 @@ from sheetopt.google.oauth import (
     store_oauth_client,
 )
 from sheetopt.google.sheets import extract_spreadsheet_id
-from sheetopt.google.auth import sheets_service
-from sheetopt.optimizer.validate import test_candidate_on_clone
 from sheetopt.models import AnalysisReport
+from sheetopt.optimizer.validate import test_candidate_on_clone
 from sheetopt.reports.pdf import build_report_pdf
 from sheetopt.secrets_store import get_secret, put_secret
 from sheetopt.security import require_admin
