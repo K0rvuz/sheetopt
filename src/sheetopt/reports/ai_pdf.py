@@ -26,7 +26,7 @@ from reportlab.platypus import (
 )
 
 from sheetopt.ai.provider import AIAnalysis
-from sheetopt.reports.pdf import BORDER, GREEN, INK, MUTED, _make_styles, _safe
+from sheetopt.reports.pdf import BORDER, MUTED, _make_styles, _safe
 
 
 class ExportDiagnostic(BaseModel):
