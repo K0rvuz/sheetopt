@@ -150,7 +150,7 @@ def build_ai_packet(
                 raise ValueError("Formula samples must belong to the selected sheet.")
             a1 = str(item.get("a1", ""))
             source_shape = str(item.get("formula_template", ""))
-            if not re.fullmatch(r"\\$?[A-Z]{1,3}\\$?[1-9][0-9]{0,6}", a1) or len(source_shape) > 460:
+            if not re.fullmatch(r"\$?[A-Z]{1,3}\$?[1-9][0-9]{0,6}", a1) or len(source_shape) > 460:
                 raise ValueError("Invalid formula example.")
             cleaned = sanitise_formula(source_shape)
             samples.append({
