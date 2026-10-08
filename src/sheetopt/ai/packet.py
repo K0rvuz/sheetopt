@@ -76,6 +76,32 @@ def _compact_packet(packet: dict[str, Any]) -> dict[str, Any]:
         packet["aggregation_review_candidates"] = packet["aggregation_review_candidates"][:1]
 
     if _packet_chars(packet) > LOCAL_FRIENDLY_PACKET_CHARS:
+        # Worst-case packets can contain six unusually long sample shapes.
+        # Try successively smaller *explicitly disclosed* evidence selections.
+        original_samples = packet["sampled_formula_examples"][:]
+        for count, shape_cap, source_cap in ((3, 175, 3), (2, 145, 2), (1, 110, 2)):
+            packet["sampled_formula_examples"] = [
+                dict(sample) for sample in original_samples[:count]
+            ]
+            packet["samples_omitted_due_to_context"] = len(original_samples) - len(
+                packet["sampled_formula_examples"]
+            )
+            packet["sample_count"] = len(packet["sampled_formula_examples"])
+            for sample in packet["sampled_formula_examples"]:
+                shape = sample["formula_shape"]
+                if len(shape) > shape_cap:
+                    sample["formula_shape"] = shape[:shape_cap]
+                    sample["shape_truncated"] = True
+            packet["knowledge_sources"] = packet["knowledge_sources"][:source_cap]
+            for doc in packet["knowledge_sources"]:
+                if len(doc.get("guidance", "")) > 140:
+                    doc["guidance"] = doc["guidance"][:137] + "..."
+            packet["cross_sheet_edges"] = packet["cross_sheet_edges"][:2]
+            packet["aggregation_review_candidates"] = packet["aggregation_review_candidates"][:1]
+            packet["hotspots"] = packet["hotspots"][:2]
+            if _packet_chars(packet) <= LOCAL_FRIENDLY_PACKET_CHARS:
+                break
+    if _packet_chars(packet) > LOCAL_FRIENDLY_PACKET_CHARS:
         # Never silently send unreviewed metadata or claim full coverage.
         raise ValueError("Compact AI context still too large; select a narrower scope.")
     return packet
