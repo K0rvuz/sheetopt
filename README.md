@@ -197,3 +197,44 @@ edges. A separate `select_context_packet()` pure function constructs small,
 deterministically bounded blocks to support future consent-gated LLM
 reasoning. It has **no network client** and no model requests. Users decide
 which data to share when such an integration is implemented.
+
+
+## AI-assisted contextual suggestions (explicit opt-in)
+
+From a live diagnosis or a previously exported JSON, expand **IA contextual
+(opcional)** in the diagnostic panel. Choose the whole workbook or one of its
+sheets. First click **Visualizar contexto que será enviado**. The server
+prepares a compact packet containing counts, sampled structural edges,
+full-column hotspots and grouping proposals. Its SHA-256 preview hash is
+required for a later request. **No model is contacted during preview.**
+
+By default, the packet uses anonymized sheet aliases; spreadsheet IDs,
+document titles, full formulas, input cell values and user credentials are
+*always omitted*. Users can separately choose to include sheet names and
+potential header labels. The browser shows the full exact JSON packet and
+destination hostname. To contact any configured model, including a local
+model, the user must explicitly check the consent box and click **Gerar
+propostas com IA**. Consent is per request and a changed context forces a new
+preview.
+
+Supported providers use the OpenAI-compatible **chat completions** endpoint
+(`/v1/chat/completions`, configured with the base URL
+`https://api.openai.com/v1` or e.g.
+`http://host.docker.internal:11434/v1`). The configured model and provider
+key belong to the local SheetOpt installation. External endpoints must use
+public HTTPS hosts and local endpoints accept loopback/private addresses or
+`host.docker.internal`. Redirects and ambient HTTP proxies are disabled.
+This is a one-shot context-informed **suggestion** stage, not an agent with
+tool calls or arbitrary access to the user's sheets. The backend validates a
+bounded JSON response, returns risk estimates and unanswered questions, and
+never executes model output as formula rewrites, queries, or merge actions.
+
+**Important:** The AI is not a verifier. Its impact guesses cannot establish
+gains or full-sheet equivalence, and recommendations must be tested in the
+clone with deterministic checks. The structural map misses local dependencies,
+named ranges and dynamic references. The original workbook is not modified.
+
+To use an Ollama instance hosted on the Windows machine from Docker, expose
+its compatible API to the Docker network and configure an address resolvable
+from the container (commonly `host.docker.internal`). Do not make such a
+service publicly accessible without authentication.

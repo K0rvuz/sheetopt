@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import sqlite3
 from pathlib import Path
@@ -12,6 +14,8 @@ from googleapiclient.errors import HttpError
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from sheetopt import __version__
+from sheetopt.ai.packet import build_ai_packet
+from sheetopt.ai.provider import infer_suggestions
 from sheetopt.context.engine import build_report_context
 from sheetopt.google.auth import credentials_from_info, sheets_service
 from sheetopt.google.oauth import (
@@ -63,6 +67,43 @@ class AISettings(BaseModel):
         if parsed.username or parsed.password or parsed.fragment:
             raise ValueError("Endpoint must not contain credentials or fragments.")
         return value
+
+
+class AIContextRequest(BaseModel):
+    report: AnalysisReport
+    context: dict[str, Any] | None = None
+    opportunities: list[dict[str, Any]] | None = Field(default=None, max_length=30)
+    focus_sheet: str | None = Field(default=None, max_length=160)
+    include_identifiers: bool = False
+    consent: bool = False
+    preview_hash: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+    @model_validator(mode="after")
+    def validate_size(self) -> AIContextRequest:
+        size = len(self.model_dump_json())
+        if size > 1_200_000 or len(self.report.findings) > 1500:
+            raise ValueError("The diagnostic exceeds the AI preview size limit.")
+        return self
+
+
+def _ai_packet(data: AIContextRequest) -> dict[str, Any]:
+    try:
+        return build_ai_packet(
+            data.report,
+            context=data.context,
+            opportunities=data.opportunities,
+            focus_sheet=data.focus_sheet,
+            include_identifiers=data.include_identifiers,
+        )
+    except (ValueError, TypeError, KeyError, AttributeError) as exc:
+        raise HTTPException(
+            status_code=422, detail="Invalid or oversized context. Narrow the selection."
+        ) from exc
+
+
+def _packet_digest(packet: dict[str, Any]) -> str:
+    content = json.dumps(packet, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 class GoogleSettings(BaseModel):
@@ -208,6 +249,61 @@ def configure_ai(data: AISettings) -> dict[str, str]:
         raise HTTPException(status_code=422, detail="External AI requires HTTPS.")
     put_secret("ai", data.model_dump())
     return {"status": "saved", "provider": data.provider}
+
+
+@app.post("/v1/ai/preview", dependencies=[Depends(require_admin)])
+def ai_context_preview(data: AIContextRequest) -> dict[str, Any]:
+    """Inspect the exact bounded payload locally; no provider is called."""
+    packet = _ai_packet(data)
+    ai = get_secret("ai") or {"provider": "disabled"}
+    parsed = urlsplit(str(ai.get("endpoint") or ""))
+    return {
+        "packet": packet,
+        "preview_hash": _packet_digest(packet),
+        "packet_chars": len(json.dumps(packet, ensure_ascii=False)),
+        "provider": ai.get("provider", "disabled"),
+        "model": ai.get("model", ""),
+        "destination": parsed.hostname or "",
+        "ready": ai.get("provider") in ("external", "local"),
+        "sent": False,
+    }
+
+
+@app.post("/v1/ai/suggest", dependencies=[Depends(require_admin)])
+def ai_context_suggestions(data: AIContextRequest) -> dict[str, Any]:
+    """Provider is contacted ONLY after an explicit approval and preview match."""
+    if not data.consent:
+        raise HTTPException(status_code=403, detail="Explicit AI transmission consent is required.")
+    packet = _ai_packet(data)
+    if not data.preview_hash or data.preview_hash != _packet_digest(packet):
+        raise HTTPException(
+            status_code=409,
+            detail="The AI packet changed; preview the context again before sending.",
+        )
+    config = get_secret("ai") or {"provider": "disabled"}
+    if config.get("provider") == "disabled":
+        raise HTTPException(status_code=409, detail="Configure a local or external AI provider first.")
+    try:
+        suggestions = infer_suggestions(config, packet)
+    except (ValueError, TypeError, KeyError) as exc:
+        # Never expose provider bodies, API keys, user data or internal request URLs.
+        logger.warning("AI suggestion request failed: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=502,
+            detail="AI provider unavailable or returned invalid structured suggestions. "
+                   "Check provider settings and connection.",
+        ) from exc
+    return {
+        "status": "unverified_suggestions",
+        "source": "ai",
+        "provider": config.get("provider"),
+        "model": config.get("model"),
+        "result": suggestions.model_dump(),
+        "writes_performed": False,
+        "merge_available": False,
+        "performance_measured": False,
+        "caveat": "These proposals are hypotheses, not validated transformations.",
+    }
 
 
 @app.post("/v1/reports/pdf", dependencies=[Depends(require_admin)])
