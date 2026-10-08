@@ -142,3 +142,69 @@ def test_ui_files_present():
     assert (folder / "index.html").is_file()
     assert (folder / "ui.js").is_file()
     assert (folder / "ui.css").is_file()
+
+
+def test_copy_timeout_preserves_diagnostic_and_does_not_retry(monkeypatch):
+    from sheetopt import workflow
+
+    monkeypatch.setattr(workflow, "credentials_from_info", lambda info: object())
+    monkeypatch.setattr(workflow, "sheets_service", lambda credentials: object())
+    monkeypatch.setattr(workflow, "drive_service", lambda credentials: object())
+    monkeypatch.setattr(
+        workflow,
+        "read_workbook",
+        lambda spreadsheet, service: WorkbookSnapshot(
+            spreadsheet_id="x" * 24,
+            title="Heavy workbook",
+            sheets=["Data"],
+            formulas=[
+                FormulaCell(sheet="Data", row=1, column=1, a1="Data!A1", formula="=SUM(B1:B3)")
+            ],
+        ),
+    )
+    attempts = []
+
+    def slow_copy(drive, file_id, title):
+        attempts.append(file_id)
+        raise TimeoutError("The read operation timed out")
+
+    monkeypatch.setattr(workflow, "clone_spreadsheet", slow_copy)
+    result = workflow.inspect_and_clone("x" * 24, {"type": "service_account"})
+    assert result["report"].formula_count == 1
+    assert result["status"] == "clone_timeout"
+    assert result["clone"] is None
+    assert "pode ter sido" in result["clone_message"]
+    assert result["merge_available"] is False
+    assert len(attempts) == 1
+
+
+def test_drive_service_uses_configured_timeout(monkeypatch):
+    from sheetopt.google import auth
+
+    calls = {}
+
+    def fake_http(*, timeout):
+        calls["timeout"] = timeout
+        return object()
+
+    def fake_authorized_http(credentials, http):
+        calls["credentials"] = credentials
+        calls["http"] = http
+        return object()
+
+    def fake_build(service, version, *, http, cache_discovery):
+        calls["service"] = service
+        calls["version"] = version
+        calls["transport"] = http
+        return object()
+
+    monkeypatch.setattr(auth.httplib2, "Http", fake_http)
+    monkeypatch.setattr(auth, "AuthorizedHttp", fake_authorized_http)
+    monkeypatch.setattr(auth, "build", fake_build)
+    monkeypatch.setattr(settings, "google_copy_timeout_seconds", 180)
+    creds = object()
+    auth.drive_service(creds)
+    assert calls["timeout"] == 180
+    assert calls["credentials"] is creds
+    assert calls["service"] == "drive"
+    assert calls["version"] == "v3"

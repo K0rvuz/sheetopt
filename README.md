@@ -71,3 +71,21 @@ Milestones:
 Never accept LLM output as a validated rewrite. Optimization must be demonstrated independently.
 
 License: Apache-2.0.
+
+
+## Large Google Sheets and Drive copy timeouts
+
+Google Drive `files.copy` can take longer for large sheets than default HTTP timeouts.
+Set `SHEETOPT_GOOGLE_COPY_TIMEOUT_SECONDS=180` (default) in your `.env` (allowed
+15–600 seconds) to change the Drive HTTP read timeout, then rebuild with
+`docker compose up -d --build`.
+
+If Google does not respond before the timeout, SheetOpt **keeps the diagnostic
+report** and reports `clone_timeout` rather than returning HTTP 500. A
+timed-out request has an **unknown outcome**: Google may still have created
+the copy. Check your Drive for a `[SheetOpt]` copy before issuing another
+copy request. SheetOpt never automatically retries timed-out `files.copy`
+requests to avoid accidental duplicate files.
+
+Use **Somente diagnosticar (sem cópia)** when you want the existing report
+without copying again. The project does not rewrite formulas yet.

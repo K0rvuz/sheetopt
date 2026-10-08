@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import httplib2
 from google.oauth2.service_account import Credentials
+from google_auth_httplib2 import AuthorizedHttp
 from googleapiclient.discovery import Resource, build
 
 from sheetopt.config import settings
@@ -33,4 +35,12 @@ def sheets_service(credentials: Credentials | None = None) -> Resource:
 
 
 def drive_service(credentials: Credentials) -> Resource:
-    return build("drive", "v3", credentials=credentials, cache_discovery=False)
+    # Drive files.copy may take much longer than a regular metadata/read request,
+    # particularly for large Google Sheets. Explicitly configure an HTTP timeout
+    # only for Drive operations. Never automatically retry a timed-out copy: the
+    # operation may have completed on Google's side.
+    transport = AuthorizedHttp(
+        credentials,
+        http=httplib2.Http(timeout=settings.google_copy_timeout_seconds),
+    )
+    return build("drive", "v3", http=transport, cache_discovery=False)

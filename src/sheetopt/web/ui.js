@@ -65,6 +65,10 @@ function showReport(data) {
     line("p", "Nenhuma fórmula encontrada. Esta etapa não executa otimizações estruturais.", node);
   } else if (data.status === "diagnosed_only") {
     line("p", "Diagnóstico somente leitura concluído; nenhuma nova cópia foi criada.", node);
+  } else if (data.status === "clone_timeout") {
+    const caution = line("p", data.clone_message ||
+      "O Google Drive demorou para responder. Verifique se uma cópia já apareceu no Drive antes de tentar novamente.", node);
+    caution.className = "warning";
   } else if (data.clone) {
     line("p", "Diagnóstico concluído. Cópia criada, sem alterações nas fórmulas.", node);
     const a = line("a", "Abrir cópia de trabalho ↗", node);
@@ -145,7 +149,9 @@ $("analyze-form").addEventListener("submit", async (event) => {
     notice("Lendo planilha e criando uma cópia quando houver fórmulas...");
     const result = await request("/v1/workbooks/analyze", "POST", { spreadsheet_url: $("spreadsheet").value.trim() });
     showReport(result);
-    notice("Diagnóstico concluído. A planilha original não foi modificada.");
+    notice(result.status === "clone_timeout"
+      ? "Diagnóstico concluído; criação da cópia com resultado desconhecido. Verifique seu Google Drive."
+      : "Diagnóstico concluído. A planilha original não foi modificada.");
   } catch (err) { notice(err.message); }
   finally { toggleBusy(form, false); }
 });
