@@ -39,10 +39,13 @@ class Element {
   addEventListener(event, listener) {
     (this.events[event] ||= []).push(listener);
   }
-  async trigger(event = "click") {
-    for (const listener of this.events[event] || []) {
-      await listener({ currentTarget: this, target: this });
-    }
+  trigger(event = "click") {
+    // Browser event listeners run synchronously; only their async work waits.
+    return Promise.all(
+      (this.events[event] || []).map(listener =>
+        listener({ currentTarget: this, target: this })
+      )
+    );
   }
   scrollIntoView() {}
 }
