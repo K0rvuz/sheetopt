@@ -155,29 +155,54 @@
   }
   function renderAiAssistant(root, result, token) {
     if (!result.context) return;
-    const panel = $node("details", null, "report-details");
-    panel.append($node("summary", "IA contextual (opcional) · propostas para revisão"));
-    panel.append($node("p",
-      "A IA pode considerar relações entre abas, padrões SUMIFS e gargalos. " +
-      "Não recebe fórmulas completas ou valores das linhas. Nenhuma planilha " +
-      "é modificada e o envio só ocorre após prévia e autorização explícita.",
+
+    const panel = $node("details", null, "report-details ai-assistant");
+    panel.append($node("summary", "IA contextual · Investigar e gerar propostas"));
+
+    const intro = $node("div", null, "ai-intro");
+    intro.append($node("p",
+      "Analise a estrutura da planilha em três etapas: escolha o escopo, " +
+      "confira os dados e autorize a consulta. A IA não modifica fórmulas.",
       "muted"
     ));
-    const configLink = $node("a", "Configurar provedor na seção Inteligência artificial");
-    configLink.href = "#ai";
-    panel.append(configLink);
-    const controls = $node("div", null, "report-filters");
+    const settingsLink = $node("a", "Configurar provedor de IA ↗");
+    settingsLink.href = "#ai";
+    intro.append(settingsLink);
+    panel.append(intro);
+
+    const makeStep = (number, title, description) => {
+      const step = $node("section", null, "ai-step");
+      const heading = $node("div", null, "ai-step-heading");
+      const numberEl = $node("span", number, "ai-step-number");
+      const titleBlock = $node("div");
+      titleBlock.append($node("h4", title));
+      titleBlock.append($node("p", description, "muted"));
+      heading.append(numberEl, titleBlock);
+      step.append(heading);
+      panel.append(step);
+      return step;
+    };
+
+    const scopeStep = makeStep("1", "Escolher a investigação",
+      "Use uma aba específica ou examine o documento inteiro.");
+    const scopeGrid = $node("div", null, "ai-scope-grid");
+
+    const focusField = $node("div", null, "ai-field");
+    const focusLabel = $node("label", "Aba analisada");
     const focus = $node("select");
-    focus.setAttribute("aria-label", "Escolher aba para análise por IA");
+    focus.setAttribute("aria-label", "Aba para análise por IA");
     const all = $node("option", "Visão geral do documento");
     all.value = "";
     focus.append(all);
     for (const sh of (result.context.sheets || []).slice(0, 80)) {
-      const opt = $node("option", sh.name);
-      opt.value = sh.name;
-      focus.append(opt);
+      const option = $node("option", sh.name);
+      option.value = sh.name;
+      focus.append(option);
     }
-    controls.append(focus);
+    focusField.append(focusLabel, focus);
+
+    const typeField = $node("div", null, "ai-field");
+    const typeLabel = $node("label", "Tipo de investigação");
     const investigation = $node("select");
     investigation.setAttribute("aria-label", "Tipo de investigação contextual");
     for (const [value, label] of [
@@ -190,166 +215,267 @@
       option.value = value;
       investigation.append(option);
     }
-    controls.append(investigation);
-    panel.append(controls);
+    typeField.append(typeLabel, investigation);
+    scopeGrid.append(focusField, typeField);
+    scopeStep.append(scopeGrid);
 
-    const labels = $node("label", null, "ai-check");
+    const privacyLabel = $node("label", null, "ai-checkbox ai-privacy");
     const includeNames = $node("input");
     includeNames.type = "checkbox";
-    labels.append(includeNames, document.createTextNode(
-      "Incluir nomes de abas e possíveis cabeçalhos no contexto enviado"
+    const privacyText = $node("span");
+    privacyText.append($node("strong", "Incluir nomes de abas e cabeçalhos"));
+    privacyText.append($node("small",
+      "Desmarcado por padrão. IDs, fórmulas completas e valores não são enviados."
     ));
-    panel.append(labels);
+    privacyLabel.append(includeNames, privacyText);
+    scopeStep.append(privacyLabel);
 
-    const previewButton = addButton(panel, "Visualizar contexto que será enviado", async () => {
-      previewButton.disabled = true;
-      runButton.disabled = true;
-      consent.checked = false;
-      previewHash = null;
-      previewInfo.replaceChildren();
-      try {
-        const response = await fetch("/v1/ai/preview", {
-          method: "POST",
-          headers: {
-            "Authorization": "Bearer " + token,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(packetRequest()),
-          cache: "no-store"
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(typeof data.detail === "string"
-            ? data.detail : "Prévia indisponível (HTTP " + response.status + ").");
-        }
-        previewHash = data.preview_hash;
-        previewInfo.append($node("p",
-          data.ready
-            ? "Destino: " + data.destination + " · Modelo: " + data.model
-            : "IA desativada. Configure seu próprio provedor antes de executar.",
-          "muted"
-        ));
-        previewInfo.append($node("p",
-          "Volume do pacote: " + quantity(data.packet_chars) +
-          " caracteres. Nenhuma chamada ao modelo foi feita.",
-          "muted"
-        ));
-        const details = $node("details", null, "finding-extra");
-        details.open = true;
-        details.append($node("summary", "Inspecionar JSON exato do contexto"));
-        details.append($node("pre", JSON.stringify(data.packet, null, 2), "formula-diff"));
-        previewInfo.append(details);
-      const references = (data.packet?.knowledge_sources || []);
-      if (references.length) {
-        const citations = $node("details", null, "finding-extra");
-        citations.append($node("summary", "Documentação oficial recuperada · " + references.length));
-        for (const source of references) {
-          const link = $node("a", source.source_id + " — " + source.title);
-          link.href = source.source_url;
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          citations.append(link, $node("p", source.guidance, "muted"));
-        }
-        previewInfo.append(citations);
-      }
-      } catch (error) {
-        previewInfo.append($node("p", error.message, "warning"));
-      } finally {
-        previewButton.disabled = false;
-      }
-    });
-
-    const probe = addButton(panel, "Investigar contexto local (sem IA)", async (event) => {
-      const button = event.currentTarget;
-      button.disabled = true;
-      try {
-        const response = await fetch("/v1/ai/investigate", {
-          method: "POST",
-          headers: {"Authorization": "Bearer " + token, "Content-Type": "application/json"},
-          body: JSON.stringify(packetRequest()),
-          cache: "no-store"
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(
-          typeof data.detail === "string" ? data.detail : "Investigação indisponível."
-        );
-        previewInfo.replaceChildren(
-          $node("p", "Contexto investigado localmente. Nenhuma IA ou Google API foi chamada.", "muted")
-        );
-        const details = $node("details", null, "finding-extra");
-        details.open = true;
-        details.append($node("summary", "Ver contexto e referências oficiais"));
-        details.append($node("pre", JSON.stringify(data.packet, null, 2), "formula-diff"));
-        previewInfo.append(details);
-        previewHash = null;
-        consent.checked = false;
-        runButton.disabled = true;
-      } catch (error) {
-        previewInfo.replaceChildren($node("p", error.message, "warning"));
-      } finally {
-        button.disabled = false;
-      }
-    });
+    const previewStep = makeStep("2", "Revisar o contexto",
+      "A prévia é local e mostra exatamente o pacote antes de qualquer envio à IA.");
+    const actions = $node("div", null, "ai-action-row");
+    const probeButton = addButton(actions, "Investigar sem IA", () => {}, "secondary");
+    const previewButton = addButton(actions, "Visualizar pacote para IA", () => {}, "secondary");
+    previewStep.append(actions);
 
     const previewInfo = $node("div", null, "ai-preview");
-    panel.append(previewInfo);
-    const approve = $node("label", null, "ai-check");
+    previewInfo.append($node("p",
+      "Escolha o escopo e visualize o pacote. Nenhuma consulta ao modelo foi feita.",
+      "muted"
+    ));
+    previewStep.append(previewInfo);
+
+    const consentStep = makeStep("3", "Autorizar e gerar",
+      "O modelo só será consultado após revisar a prévia e marcar a autorização.");
+    const approve = $node("label", null, "ai-checkbox ai-consent");
     const consent = $node("input");
     consent.type = "checkbox";
-    approve.append(consent, document.createTextNode(
-      "Li a prévia e autorizo este envio ao provedor configurado."
+    consent.disabled = true;
+    const consentText = $node("span");
+    consentText.append($node("strong",
+      "Li a prévia e autorizo o envio deste pacote ao provedor configurado."
     ));
-    panel.append(approve);
+    approve.append(consent, consentText);
+    consentStep.append(approve);
+
+    const runButton = addButton(consentStep, "Gerar propostas com IA", () => {});
+    runButton.classList.add("ai-run");
+    runButton.disabled = true;
+
+    const progress = $node("div", null, "ai-progress");
+    progress.hidden = true;
+    progress.setAttribute("role", "status");
+    progress.setAttribute("aria-live", "polite");
+    const progressHeader = $node("div", null, "ai-progress-header");
+    const spinner = $node("span", null, "ai-spinner");
+    spinner.setAttribute("aria-hidden", "true");
+    const progressInfo = $node("div", null, "ai-progress-info");
+    const progressTitle = $node("strong", "Aguardando...");
+    const progressDescription = $node("p", "", "muted");
+    progressInfo.append(progressTitle, progressDescription);
+    progressHeader.append(spinner, progressInfo);
+    const progressBar = $node("div", null, "ai-progress-track");
+    progressBar.setAttribute("role", "progressbar");
+    progressBar.setAttribute("aria-label", "Processamento da IA em andamento");
+    progressBar.append($node("span", null, "ai-progress-fill"));
+    const progressFooter = $node("div", null, "ai-progress-footer");
+    const elapsedText = $node("span", "Tempo decorrido: 00:00");
+    elapsedText.setAttribute("aria-hidden", "true");
+    progressFooter.append(elapsedText, $node("span",
+      "Indicador de atividade, não de porcentagem concluída."
+    ));
+    progress.append(progressHeader, progressBar, progressFooter);
+    consentStep.append(progress);
+
+    const resultArea = $node("div", null, "ai-suggestions");
+    resultArea.setAttribute("aria-live", "polite");
+    consentStep.append(resultArea);
 
     let previewHash = null;
-    const reset = () => {
-      previewHash = null;
-      consent.checked = false;
-      runButton.disabled = true;
-      previewInfo.replaceChildren($node("p",
-        "Os parâmetros mudaram. Gere uma nova prévia antes de enviar.", "muted"
-      ));
-    };
-    focus.addEventListener("change", reset);
-    investigation.addEventListener("change", reset);
-    includeNames.addEventListener("change", reset);
-    consent.addEventListener("change", () => {
-      runButton.disabled = !(consent.checked && previewHash);
-    });
+    let previewReady = false;
+    let busy = false;
+    let timer = null;
+    let started = 0;
+
     const packetRequest = () => ({
       report: result.report,
       context: result.context || null,
       opportunities: result.aggregation_opportunities || [],
       focus_sheet: focus.value || null,
       investigation: investigation.value,
-      include_identifiers: includeNames.checked,
+      include_identifiers: includeNames.checked
     });
 
-    const resultArea = $node("div", null, "ai-suggestions");
-    const runButton = addButton(panel, "Gerar propostas com IA", async () => {
-      if (!consent.checked || !previewHash) return;
+    const duration = (seconds) => {
+      const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
+      const remainder = String(seconds % 60).padStart(2, "0");
+      return minutes + ":" + remainder;
+    };
+    const updateElapsed = () => {
+      elapsedText.textContent = "Tempo decorrido: " +
+        duration(Math.floor((Date.now() - started) / 1000));
+    };
+    const setBusy = (active, title = "", description = "") => {
+      busy = active;
+      focus.disabled = active;
+      investigation.disabled = active;
+      includeNames.disabled = active;
+      probeButton.disabled = active;
+      previewButton.disabled = active;
+      consent.disabled = active || !previewReady;
+      runButton.disabled = active || !previewReady || !consent.checked || !previewHash;
+      if (timer !== null) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+      if (active) {
+        started = Date.now();
+        progressTitle.textContent = title;
+        progressDescription.textContent = description;
+        progress.hidden = false;
+        progress.classList.add("is-running");
+        progress.classList.remove("is-complete");
+        updateElapsed();
+        timer = window.setInterval(updateElapsed, 1000);
+      } else {
+        progress.classList.remove("is-running");
+      }
+    };
+    const showCompletion = (message) => {
+      progressTitle.textContent = message;
+      progressDescription.textContent = "A resposta chegou ao SheetOpt.";
+      progress.classList.add("is-complete");
+      progress.classList.remove("is-running");
+    };
+    const reset = () => {
+      previewHash = null;
+      previewReady = false;
+      consent.checked = false;
+      consent.disabled = true;
       runButton.disabled = true;
-      runButton.textContent = "Aguardando provedor de IA...";
-      try {
-        const response = await fetch("/v1/ai/suggest", {
-          method: "POST",
-          headers: {
-            "Authorization": "Bearer " + token,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            ...packetRequest(),
-            consent: true,
-            preview_hash: previewHash
-          }),
-          cache: "no-store"
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(typeof data.detail === "string"
-            ? data.detail : "Erro no provedor de IA (HTTP " + response.status + ").");
+      progress.hidden = true;
+      resultArea.replaceChildren();
+      previewInfo.replaceChildren($node("p",
+        "O escopo mudou. Gere uma nova prévia antes de autorizar o envio.",
+        "muted"
+      ));
+    };
+    focus.addEventListener("change", reset);
+    investigation.addEventListener("change", reset);
+    includeNames.addEventListener("change", reset);
+    consent.addEventListener("change", () => {
+      runButton.disabled = busy || !previewReady || !consent.checked || !previewHash;
+    });
+
+    const post = async (path, data) => {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data),
+        cache: "no-store"
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof body.detail === "string"
+          ? body.detail : "Não foi possível concluir a operação (HTTP " +
+            response.status + ").");
+      }
+      return body;
+    };
+
+    const renderPayload = (data, prefix) => {
+      previewInfo.replaceChildren();
+      previewInfo.append($node("p", prefix, "muted"));
+      const metadata = $node("div", null, "ai-preview-meta");
+      if ("destination" in data) {
+        metadata.append(
+          $node("span", "Destino: " + (data.destination || "não configurado")),
+          $node("span", "Modelo: " + (data.model || "não configurado"))
+        );
+      }
+      metadata.append($node("span",
+        "Tamanho: " + quantity(data.packet_chars ||
+          JSON.stringify(data.packet || {}).length) + " caracteres"
+      ));
+      previewInfo.append(metadata);
+      const details = $node("details", null, "ai-payload-details");
+      details.append($node("summary", "Inspecionar JSON exato do contexto"));
+      details.append($node("pre", JSON.stringify(data.packet, null, 2), "ai-json"));
+      previewInfo.append(details);
+      const references = data.packet?.knowledge_sources || [];
+      if (references.length) {
+        const citations = $node("details", null, "ai-payload-details");
+        citations.append($node("summary",
+          "Documentação oficial recuperada · " + references.length));
+        for (const source of references) {
+          const item = $node("div", null, "ai-source");
+          const link = $node("a", source.source_id + " — " + source.title);
+          link.href = source.source_url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          item.append(link, $node("p", source.guidance, "muted"));
+          citations.append(item);
         }
+        previewInfo.append(citations);
+      }
+    };
+
+    previewButton.addEventListener("click", async () => {
+      if (busy) return;
+      reset();
+      setBusy(true, "Preparando prévia...", "Nenhuma chamada ao modelo é feita nesta etapa.");
+      try {
+        const data = await post("/v1/ai/preview", packetRequest());
+        previewHash = data.preview_hash;
+        previewReady = data.ready === true;
+        renderPayload(data, data.ready
+          ? "Prévia pronta. Confira o pacote e o destino antes de autorizar."
+          : "O provedor não está configurado. Configure a IA e gere uma nova prévia.");
+        consent.disabled = !previewReady;
+        showCompletion("Prévia concluída");
+      } catch (error) {
+        previewInfo.replaceChildren($node("p", error.message, "warning"));
+        progress.hidden = true;
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    probeButton.addEventListener("click", async () => {
+      if (busy) return;
+      reset();
+      setBusy(true, "Investigando contexto...", "Consulta somente ao diagnóstico local.");
+      try {
+        const data = await post("/v1/ai/investigate", packetRequest());
+        renderPayload(data, "Investigação local concluída. Nenhum dado foi enviado à IA.");
+        showCompletion("Investigação concluída");
+      } catch (error) {
+        previewInfo.replaceChildren($node("p", error.message, "warning"));
+        progress.hidden = true;
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    runButton.addEventListener("click", async () => {
+      if (busy || !consent.checked || !previewHash || !previewReady) return;
+      const approvedHash = previewHash;
+      resultArea.replaceChildren();
+      setBusy(true, "Consultando o modelo...",
+        "O Ollama está preparando uma resposta. Modelos locais podem " +
+        "levar vários minutos. Mantenha esta página aberta.");
+      runButton.textContent = "Processando análise...";
+      try {
+        const data = await post("/v1/ai/suggest", {
+          ...packetRequest(),
+          consent: true,
+          preview_hash: approvedHash
+        });
         resultArea.replaceChildren();
+        const resultHeading = $node("h4", "Propostas recebidas");
+        resultArea.append(resultHeading);
         resultArea.append($node("p", data.result.summary, "muted"));
         for (const proposal of data.result.proposals || []) {
           const section = $node("details", null, "report-group");
@@ -357,7 +483,7 @@
           const inner = $node("div", null, "report-group-body");
           inner.append($node("p", proposal.rationale, "muted"));
           inner.append($node("p",
-            "Impacto hipotético: " + proposal.impact +
+            "Impacto estimado: " + proposal.impact +
             " · Risco: " + proposal.risk +
             " · Abas: " + (proposal.target_sheets || []).join(", "), "muted"
           ));
@@ -365,35 +491,43 @@
           for (const step of proposal.validation_steps || []) {
             steps.append($node("li", step));
           }
-          inner.append($node("strong", "Validação obrigatória antes de alterar qualquer fórmula"));
+          inner.append($node("strong", "Verificações necessárias"));
           inner.append(steps);
           section.append(inner);
           resultArea.append(section);
         }
-        const missing = data.result.missing_context || [];
-        if (missing.length) {
-          const todo = $node("details", null, "report-group");
-          todo.append($node("summary", "Informações adicionais necessárias"));
+        if (data.result.missing_context?.length) {
+          const missing = $node("details", null, "report-group");
+          missing.append($node("summary", "Informações adicionais necessárias"));
           const list = $node("ul");
-          for (const item of missing) list.append($node("li", item));
-          todo.append(list);
-          resultArea.append(todo);
+          for (const item of data.result.missing_context) list.append($node("li", item));
+          missing.append(list);
+          resultArea.append(missing);
         }
         resultArea.append($node("p",
-          "Sugestões não verificadas. Ganho de desempenho não medido; merge indisponível.",
+          "Sugestões não verificadas. Desempenho não medido; merge indisponível.",
           "warning"
         ));
-        previewHash = null;
-        consent.checked = false;
+        showCompletion("Análise concluída");
       } catch (error) {
-        resultArea.replaceChildren($node("p", error.message, "warning"));
+        resultArea.replaceChildren($node("p",
+          "A análise não foi concluída: " + error.message +
+          " Você pode gerar uma nova prévia para tentar novamente.",
+          "warning"
+        ));
+        progressTitle.textContent = "Falha na consulta";
+        progressDescription.textContent = "O modelo não retornou propostas utilizáveis.";
+        progress.classList.remove("is-running");
+        progress.classList.add("is-complete");
       } finally {
-        runButton.disabled = true;
+        previewHash = null;
+        previewReady = false;
+        consent.checked = false;
         runButton.textContent = "Gerar propostas com IA";
+        setBusy(false);
       }
     });
-    runButton.disabled = true;
-    panel.append(resultArea);
+
     root.append(panel);
   }
 

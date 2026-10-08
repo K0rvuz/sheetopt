@@ -17,6 +17,7 @@ jobs:
       - run: ruff check src tests
       - run: node --check src/sheetopt/web/ui.js
       - run: node --check src/sheetopt/web/report.js
+      - run: node --test tests/test_ai_ui.cjs
       - run: pytest -q
 
   docker-smoke:
