@@ -55,41 +55,7 @@ function line(tag, text, parent) {
   return el;
 }
 function showReport(data) {
-  const node = $("results");
-  node.replaceChildren();
-  node.hidden = false;
-  const report = data.report;
-  line("h3", report.title, node);
-  line("p", report.sheet_count + " abas · " + report.formula_count + " fórmulas · " + report.pattern_count + " padrões · " + report.findings.length + " alertas", node);
-  if (data.status === "no_formulas" || (data.status === "diagnosed_only" && !report.formula_count)) {
-    line("p", "Nenhuma fórmula encontrada. Esta etapa não executa otimizações estruturais.", node);
-  } else if (data.status === "diagnosed_only") {
-    line("p", "Diagnóstico somente leitura concluído; nenhuma nova cópia foi criada.", node);
-  } else if (data.status === "clone_timeout") {
-    const caution = line("p", data.clone_message ||
-      "O Google Drive demorou para responder. Verifique se uma cópia já apareceu no Drive antes de tentar novamente.", node);
-    caution.className = "warning";
-  } else if (data.clone) {
-    line("p", "Diagnóstico concluído. Cópia criada, sem alterações nas fórmulas.", node);
-    const a = line("a", "Abrir cópia de trabalho ↗", node);
-    const url = new URL(data.clone.url);
-    if (url.protocol === "https:" && url.hostname === "docs.google.com") {
-      a.href = url.href;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-    } else {
-      a.removeAttribute("href");
-    }
-  }
-  line("p", "Otimizações aplicadas: 0 · Merge indisponível até a implementação do validador.", node);
-  report.findings.forEach((finding) => {
-    const card = document.createElement("div");
-    card.className = "finding";
-    line("strong", finding.rule_id + " · " + finding.title, card);
-    line("p", finding.message, card);
-    line("small", "Prioridade: " + finding.severity, card);
-    node.append(card);
-  });
+  window.SheetOptReports.renderReport(data, adminToken);
 }
 function toggleBusy(form, busy) {
   for (const control of form.querySelectorAll("button, input, select")) control.disabled = busy;

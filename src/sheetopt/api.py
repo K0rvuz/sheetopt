@@ -74,6 +74,11 @@ def ui_script() -> FileResponse:
     return FileResponse(_WEB_DIR / "ui.js", media_type="application/javascript")
 
 
+@app.get("/report.js")
+def report_script() -> FileResponse:
+    return FileResponse(_WEB_DIR / "report.js", media_type="application/javascript")
+
+
 @app.get("/ui.css")
 def ui_styles() -> FileResponse:
     return FileResponse(_WEB_DIR / "ui.css", media_type="text/css")

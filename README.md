@@ -89,3 +89,24 @@ requests to avoid accidental duplicate files.
 
 Use **Somente diagnosticar (sem cópia)** when you want the existing report
 without copying again. The project does not rewrite formulas yet.
+
+## Diagnostic dashboard and exports
+
+The results panel displays a compact summary, severity breakdown, collapsible
+groups by rule and filters for severity/text. It intentionally does not mount
+hundreds of individual findings until a group is expanded. A collapsible
+execution record shows per-stage durations for read, diagnosis and copy
+(available only after the API returns; this is not live progress tracking).
+
+You can download a complete structured **PDF** or **JSON** of the report
+without reading Google Sheets again. The PDF includes totals, findings by
+severity and rule, frequently used functions, available execution timings,
+locations and rule recommendations. Exports are generated from the
+in-memory report returned to the browser and do **not** apply any changes.
+The export endpoint is authenticated, does not save a PDF server-side and
+rejects unreasonably large payloads. Treat downloads as potentially
+confidential because they may include spreadsheet names, references and
+pieces of formulas.
+
+All findings are diagnostic only. Performance improvement and safe
+formula rewrites must be validated and measured in later work.
