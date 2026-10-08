@@ -141,3 +141,14 @@ changes require more work. The original is never modified and merge remains
 disabled. Changes on the clone can be inspected manually. There is no
 automatic retry after an ambiguous write. This is an experimental foundation,
 not a general purpose correction of PERF-003 findings.
+
+
+### Full-column diagnostics (PERF-003) — review-only
+
+The UI now exposes a compact list of the highest-frequency full-column
+references, even when no executable OPT-LET-001 candidate exists. These
+are **investigation targets**, not automatically validated rewrites. Their
+frequency estimates are based on normalized patterns, not benchmark results.
+The rule no longer counts occurrences appearing only inside double-quoted
+formula text. Editing A:A to a fixed-height range may silently drop new rows;
+no range-limiting change is currently authorized.

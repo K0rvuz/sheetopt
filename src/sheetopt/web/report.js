@@ -153,6 +153,58 @@
     details.append(content);
     container.append(details);
   }
+  function renderPerf003Review(root, report) {
+    const findings = (report.findings || [])
+      .filter((finding) => finding.rule_id === "PERF-003")
+      .slice()
+      .sort((a, b) =>
+        Number(b.evidence?.weighted_occurrences || 0) -
+        Number(a.evidence?.weighted_occurrences || 0)
+      );
+    if (!findings.length) return;
+    const panel = $node("details", null, "report-details");
+    panel.append($node("summary",
+      "PERF-003 · Referências a colunas inteiras · " + quantity(findings.length) +
+      " oportunidades de revisão"
+    ));
+    panel.append($node("p",
+      "Estas ocorrências podem causar cálculos repetidos. As contagens são estimativas " +
+      "baseadas em padrões de fórmulas, não medições de tempo nem número de células processadas. " +
+      "Não há reescrita automática: limitar um intervalo sem conhecer o crescimento dos dados " +
+      "pode alterar o resultado futuro.",
+      "muted"
+    ));
+    const list = $node("div", null, "review-opportunities");
+    for (const finding of findings.slice(0, 8)) {
+      const card = $node("div", null, "finding");
+      card.append($node("strong",
+        String(finding.evidence?.reference || "Intervalo não identificado")
+      ));
+      card.append($node("p", finding.message, "muted"));
+      if (Array.isArray(finding.locations) && finding.locations.length) {
+        card.append($node("p",
+          "Exemplos: " + finding.locations.slice(0, 5).join(", "), "finding-locations"
+        ));
+      }
+      card.append($node("p",
+        "Para transformar com segurança: identificar a aba de origem, o último dado " +
+        "utilizado, a política de novas linhas, fórmulas dependentes e os tipos de dados. " +
+        "Depois comparar o intervalo afetado na cópia.",
+        "muted"
+      ));
+      list.append(card);
+    }
+    if (findings.length > 8) {
+      list.append($node("p",
+        "Outros " + quantity(findings.length - 8) + " intervalos estão no relatório " +
+        "completo (PDF/JSON) e em Explorar alertas por regra.",
+        "muted"
+      ));
+    }
+    panel.append(list);
+    root.append(panel);
+  }
+
   function renderCandidates(root, result, token) {
     const candidates = result.optimization_candidates || [];
     if (!result.clone) return;
@@ -165,7 +217,8 @@
         "O teste altera uma célula da CÓPIA, compara valor e formatos, e reverte em caso de divergência. " +
         "Isso não valida a planilha inteira e não mede aceleração."
       : "Nenhuma fórmula corresponde à regra experimental OPT-LET-001. " +
-        "O motor ainda não corrige os alertas PERF-003 de colunas inteiras.");
+        "Isso não significa ausência de oportunidades: as referências de colunas " +
+        "inteiras são listadas abaixo para revisão, sem alteração automática.");
     text.className = "muted";
     block.append(text);
     const cloneId = result.clone.id;
@@ -365,6 +418,7 @@
     });
     root.append(detail);
     renderCandidates(root, result, token);
+    renderPerf003Review(root, report);
     root.scrollIntoView({behavior: "smooth", block: "start"});
   }
   window.SheetOptReports = { renderReport };
