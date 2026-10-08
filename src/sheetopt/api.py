@@ -12,6 +12,7 @@ from googleapiclient.errors import HttpError
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from sheetopt import __version__
+from sheetopt.context.engine import build_report_context
 from sheetopt.google.auth import credentials_from_info, sheets_service
 from sheetopt.google.oauth import (
     complete_oauth,
@@ -234,7 +235,10 @@ def analyze(request: AnalyzeRequest) -> AnalysisReport:
 @app.post("/v1/optimizations/plan", dependencies=[Depends(require_admin)])
 def plan_from_existing_report(payload: ReportExportRequest) -> dict[str, Any]:
     """Plan offline from an exported diagnosis, without accessing Google."""
-    return {"aggregation_opportunities": plan_aggregations(payload.report)}
+    return {
+        "aggregation_opportunities": plan_aggregations(payload.report),
+        "context": build_report_context(payload.report),
+    }
 
 
 @app.post("/v1/workbooks/plan", dependencies=[Depends(require_admin)])

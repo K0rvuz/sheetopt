@@ -48,6 +48,7 @@ def read_workbook(value: str, service: Resource | None = None) -> WorkbookSnapsh
     sheets = [item["properties"]["title"] for item in metadata.get("sheets", [])]
 
     formulas: list[FormulaCell] = []
+    sheet_headers: dict[str, list[str]] = {}
     if sheets:
         response = (
             service.spreadsheets()
@@ -61,7 +62,23 @@ def read_workbook(value: str, service: Resource | None = None) -> WorkbookSnapsh
             .execute()
         )
         for sheet_name, value_range in zip(sheets, response.get("valueRanges", []), strict=False):
-            for row_index, row in enumerate(value_range.get("values", []), start=1):
+            values = value_range.get("values", [])
+            # Bounded, optional column-label hints. They may be data rather
+            # than real headers: the context engine marks them as possible.
+            # Never export raw rows or send this material to an AI provider.
+            for row in values[:3]:
+                labels = [
+                    value.strip() for value in row[:24]
+                    if isinstance(value, str)
+                    and 2 <= len(value.strip()) <= 64
+                    and not value.startswith("=")
+                    and "@" not in value
+                    and "://" not in value
+                ]
+                if len(labels) >= 2:
+                    sheet_headers[sheet_name] = list(dict.fromkeys(labels))[:12]
+                    break
+            for row_index, row in enumerate(values, start=1):
                 for column_index, cell_value in enumerate(row, start=1):
                     if isinstance(cell_value, str) and cell_value.startswith("="):
                         a1 = f"{sheet_name}!{column_number_to_name(column_index)}{row_index}"
@@ -75,5 +92,6 @@ def read_workbook(value: str, service: Resource | None = None) -> WorkbookSnapsh
                             )
                         )
     return WorkbookSnapshot(
-        spreadsheet_id=spreadsheet_id, title=title, sheets=sheets, formulas=formulas
+        spreadsheet_id=spreadsheet_id, title=title, sheets=sheets,
+        formulas=formulas, sheet_headers=sheet_headers
     )

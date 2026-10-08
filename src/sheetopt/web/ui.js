@@ -214,7 +214,8 @@ $("import-report-form").addEventListener("submit", async (event) => {
       clone: null,
       events: Array.isArray(parsed.events) ? parsed.events : [],
       optimization_candidates: [],
-      aggregation_opportunities: planning.aggregation_opportunities || []
+      aggregation_opportunities: planning.aggregation_opportunities || [],
+      context: planning.context || null
     });
     $("report-json-file").value = "";
     notice("Plano preparado a partir do JSON. Nenhuma planilha foi acessada ou alterada.");

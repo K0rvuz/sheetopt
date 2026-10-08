@@ -5,6 +5,7 @@ import time
 from typing import Any
 
 from sheetopt.analysis.analyzer import analyze_snapshot
+from sheetopt.context.engine import build_workbook_context
 from sheetopt.google.auth import credentials_from_info, drive_service, sheets_service
 from sheetopt.google.drive import clone_spreadsheet
 from sheetopt.google.sheets import read_workbook
@@ -39,8 +40,15 @@ def inspect_and_clone(
         "stage": "analyze", "status": "completed",
         "duration_ms": round((time.perf_counter() - begin) * 1000),
     })
+    begin = time.perf_counter()
+    context = build_workbook_context(snapshot, report)
+    events.append({
+        "stage": "context", "status": "completed",
+        "duration_ms": round((time.perf_counter() - begin) * 1000),
+    })
     result: dict[str, Any] = {
         "report": report,
+        "context": context,
         "clone": None,
         "status": "no_formulas" if not snapshot.formulas else "diagnosed",
         "optimization_count": 0,

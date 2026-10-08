@@ -169,3 +169,31 @@ It works both with a new diagnosis and with **Importar diagnóstico JSON**
 Experimental OPT-LET-001 can also recognize the semicolon argument delimiter
 used by many spreadsheet locales for a very narrow repeated-function case.
 This does not make mixed-locale, nested or multi-SUMIFS rewrites safe.
+
+
+## Workbook Context Engine (initial foundation)
+
+A completed live diagnostic now includes a **bounded structural context**:
+per-tab formula totals, optional *possible* header labels sampled from the
+first three rows, explicit inter-tab references (one count per formula per
+referenced sheet), dynamic-function counts and high-impact full-column
+hotspots. The context is represented as JSON and shown in a collapsible UI
+section with its own export button. It is built from an existing read-only
+snapshot, never calls an AI provider, never writes formulas and never stores a
+new dataset server-side.
+
+**Limits:** these edges are not a verified cell-level dependency graph:
+references hidden in INDIRECT, named ranges, QUERY results, array spills,
+external sources and local A1 references are unresolved. Long formulas are
+skipped for dependency extraction and the graph is capped to 120 edges; the
+total edge count and whether it was truncated are disclosed. Header candidates
+are heuristics, may contain internal information and are not a confirmed
+database schema. Output is not a validation certificate.
+
+Importing an old diagnostic JSON creates a clearly labeled
+`diagnostic_only` context using sample locations, not a fabricated complete
+graph. It contains no raw input rows and cannot reconstruct full dependency
+edges. A separate `select_context_packet()` pure function constructs small,
+deterministically bounded blocks to support future consent-gated LLM
+reasoning. It has **no network client** and no model requests. Users decide
+which data to share when such an integration is implemented.

@@ -14,7 +14,7 @@
     "PERF-003": "Referências a colunas inteiras",
     "PERF-004": "Importações IMPORTRANGE duplicadas"
   };
-  const stages = { read: "Leitura das abas e fórmulas", analyze: "Análise das regras", copy: "Cópia de trabalho" };
+  const stages = { read: "Leitura das abas e fórmulas", analyze: "Análise das regras", context: "Mapeamento de contexto", copy: "Cópia de trabalho" };
   const stageStates = { completed: "Concluído", skipped: "Ignorado", timeout: "Tempo esgotado" };
   const $node = (tag, value, className) => {
     const element = document.createElement(tag);
@@ -153,6 +153,91 @@
     details.append(content);
     container.append(details);
   }
+  function renderWorkbookContext(root, result) {
+    const context = result.context;
+    if (!context) return;
+    const panel = $node("details", null, "report-details");
+    panel.append($node("summary",
+      "Contexto estrutural do documento · " + quantity(context.sheet_count) + " abas"
+    ));
+    const complete = context.coverage === "formula_snapshot";
+    panel.append($node("p",
+      complete
+        ? "Inventário gerado a partir de todas as fórmulas lidas. As conexões mostram " +
+          "apenas referências explícitas entre abas, não o grafo completo de células."
+        : "Contexto parcial reconstruído do JSON de diagnóstico. " +
+          "Não contém a lista completa de abas nem arestas de dependência verificáveis.",
+      "muted"
+    ));
+    const total = $node("p", complete
+      ? quantity(context.edge_count_total) + " conexões entre abas; " +
+        quantity(context.dynamic_formula_count) + " fórmulas com funções dinâmicas."
+      : "Para construir as dependências entre abas é necessário reler a planilha com sua conta Google.",
+      "muted"
+    );
+    panel.append(total);
+    const edges = (context.edges || []).slice(0, 15);
+    if (edges.length) {
+      const sub = $node("details", null, "report-group");
+      sub.append($node("summary", "Dependências explícitas entre abas"));
+      const body = $node("div", null, "report-group-body");
+      for (const edge of edges) {
+        body.append($node("p",
+          edge.from_sheet + " → " + edge.depends_on_sheet +
+          " · " + quantity(edge.formula_cells) + " células com referências",
+          "muted"
+        ));
+      }
+      sub.append(body);
+      panel.append(sub);
+    }
+    const sheetList = (context.sheets || []).slice().sort(
+      (a, b) => Number(b.formula_count || 0) - Number(a.formula_count || 0)
+    );
+    const sheetGroup = $node("details", null, "report-group");
+    sheetGroup.append($node("summary",
+      "Abas identificadas · " + quantity(context.sheets?.length || 0)
+    ));
+    const contents = $node("div", null, "report-group-body");
+    for (const sh of sheetList.slice(0, 41)) {
+      const row = $node("p",
+        sh.name + " · " + (
+          sh.formula_count === null
+            ? "quantidade de fórmulas não disponível"
+            : quantity(sh.formula_count) + " fórmulas"
+        ), "muted");
+      contents.append(row);
+      if (Array.isArray(sh.possible_headers) && sh.possible_headers.length) {
+        contents.append($node("p",
+          "Possíveis cabeçalhos: " + sh.possible_headers.slice(0, 8).join(" · "),
+          "finding-locations"
+        ));
+      }
+    }
+    sheetGroup.append(contents);
+    panel.append(sheetGroup);
+    const caveats = $node("details", null, "finding-extra");
+    caveats.append($node("summary", "Limitações e privacidade"));
+    const list = $node("ul");
+    for (const note of context.limitations || []) list.append($node("li", note));
+    list.append($node("li",
+      "O SheetOpt não contata modelos de IA nesta etapa. " +
+      "Nomes de abas e cabeçalhos podem conter informações internas."
+    ));
+    caveats.append(list);
+    panel.append(caveats);
+    addButton(panel, "Exportar contexto JSON", () => {
+      const content = JSON.stringify({
+        generated_at: new Date().toISOString(),
+        context,
+        ai_transmission: "none"
+      }, null, 2);
+      downloadBlob("sheetopt-contexto.json",
+        new Blob([content], {type: "application/json;charset=utf-8"}));
+    });
+    root.append(panel);
+  }
+
   function renderPerf003Review(root, report) {
     const findings = (report.findings || [])
       .filter((finding) => finding.rule_id === "PERF-003")
@@ -434,7 +519,8 @@
         status: result.status || "diagnosed",
         events: result.events || [],
         clone: result.clone || null,
-        aggregation_opportunities: result.aggregation_opportunities || []
+        aggregation_opportunities: result.aggregation_opportunities || [],
+        context: result.context || null
       }, null, 2);
       downloadBlob("sheetopt-diagnostico.json",
         new Blob([json], {type: "application/json;charset=utf-8"}));
@@ -480,6 +566,7 @@
     });
     root.append(detail);
     renderCandidates(root, result, token);
+    renderWorkbookContext(root, result);
     renderPerf003Review(root, report);
     renderAggregationPlanning(root, result);
     root.scrollIntoView({behavior: "smooth", block: "start"});
