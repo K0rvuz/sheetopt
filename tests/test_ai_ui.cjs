@@ -48,6 +48,8 @@ class Element {
     );
   }
   scrollIntoView() {}
+  click() {}
+  remove() {}
 }
 
 function descendants(node) {
@@ -59,6 +61,7 @@ function setup(fetchImpl) {
   const root = new Element("div");
   const notice = new Element("div");
   const timers = new Map();
+  const downloads = [];
   let nextTimer = 0;
   const window = {
     setInterval: (callback) => {
@@ -66,15 +69,20 @@ function setup(fetchImpl) {
       timers.set(id, callback);
       return id;
     },
-    clearInterval: (id) => timers.delete(id)
+    clearInterval: (id) => timers.delete(id),
+    setTimeout: () => 0
   };
   const document = {
+    body: new Element("body"),
     getElementById: (id) => id === "results" ? root : notice,
     createElement: (tag) => new Element(tag),
     createTextNode: (value) => new Element("text", String(value))
   };
+  class DownloadURL extends URL {}
+  DownloadURL.createObjectURL = (blob) => { downloads.push(blob); return "blob:synthetic"; };
+  DownloadURL.revokeObjectURL = () => {};
   vm.runInNewContext(fs.readFileSync(path.join(WEB_DIR, "report.js"), "utf8"), {
-    window, document, fetch: fetchImpl, URL, Blob, Date,
+    window, document, fetch: fetchImpl, URL: DownloadURL, Blob, Date,
     console, setTimeout
   });
   const report = {
@@ -101,7 +109,7 @@ function setup(fetchImpl) {
     assert.ok(match, "Expected element to exist.");
     return match;
   };
-  return { find, root, timers };
+  return { find, root, timers, downloads };
 }
 
 test("AI UI shows scoped checkboxes and remains idle before approval", () => {
@@ -210,4 +218,69 @@ test("AI UI ends animation on provider error without pretending success", async 
   assert.equal(ui.timers.size, 0);
   assert.equal(run.disabled, true);
   assert.equal(ui.find(x => x.tag === "strong" && x.textContent === "Falha na consulta").tag, "strong");
+});
+
+test("complete AI exports preserve the full structured response and preview context", async () => {
+  let postedPDF;
+  const packet = {
+    packet_version: 1,
+    knowledge_sources: [{source_id: "SHEETS-FUNC-QUERY", title: "QUERY"}],
+    cross_sheet_edges: [{consumer_sheet: "sheet_01", source_sheet: "sheet_02", formula_cells: 9}]
+  };
+  const result = {
+    summary: "Five hypotheses, no verified speedup.",
+    proposals: Array.from({length: 5}, (_, index) => ({
+      title: "Proposal " + (index + 1),
+      rationale: "Rationale " + (index + 1),
+      risk: "high", impact: "unknown",
+      target_sheets: ["sheet_01"],
+      validation_steps: ["Compare cell output " + (index + 1)],
+      source_ids: ["SHEETS-FUNC-QUERY"]
+    })),
+    missing_context: ["Need dates and null semantics."]
+  };
+  const ui = setup(async (url, opts) => {
+    if (url === "/v1/ai/preview") {
+      return {ok: true, json: async () => ({
+        preview_hash: "synthetic-digest", packet, destination: "host.docker.internal",
+        ready: true, model: "qwen3.5:4b"
+      })};
+    }
+    if (url === "/v1/ai/suggest") {
+      return {ok: true, json: async () => ({
+        result, model: "qwen3.5:4b", provider: "local"
+      })};
+    }
+    if (url === "/v1/reports/ai/pdf") {
+      postedPDF = JSON.parse(opts.body);
+      return {ok: true, blob: async () => new Blob(["%PDF-"], {type: "application/pdf"})};
+    }
+    throw Error("Unexpected network request: " + url);
+  });
+  await ui.find(x => x.tag === "button" &&
+    x.textContent === "Visualizar pacote para IA").trigger();
+  const consent = ui.find(x => x.tag === "input" && x.type === "checkbox" &&
+    descendants(ui.root).some(p => p.classList.contains("ai-consent") &&
+      descendants(p).includes(x)));
+  consent.checked = true;
+  await consent.trigger("change");
+  await ui.find(x => x.tag === "button" && x.textContent === "Gerar propostas com IA").trigger();
+
+  await ui.find(x => x.tag === "button" && x.textContent === "Exportar JSON completo").trigger();
+  assert.equal(ui.downloads.length, 1);
+  const file = JSON.parse(await ui.downloads[0].text());
+  assert.equal(file.analysis.proposals.length, 5);
+  assert.deepEqual(file.analysis.missing_context, result.missing_context);
+  assert.equal(file.context_packet.cross_sheet_edges[0].formula_cells, 9);
+  assert.equal(file.context_sha256, "synthetic-digest");
+  assert.equal(file.model, "qwen3.5:4b");
+  assert.equal(file.performance_measured, false);
+  assert.equal(file.writes_performed, false);
+
+  await ui.find(x => x.tag === "button" && x.textContent === "Exportar PDF completo").trigger();
+  assert.equal(ui.downloads.length, 2);
+  assert.equal(ui.downloads[1].type, "application/pdf");
+  assert.equal(postedPDF.context_sha256, file.context_sha256);
+  assert.equal(JSON.stringify(postedPDF.analysis), JSON.stringify(file.analysis));
+  assert.equal(JSON.stringify(postedPDF.context_packet), JSON.stringify(file.context_packet));
 });
