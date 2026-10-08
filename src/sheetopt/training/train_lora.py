@@ -52,8 +52,8 @@ def main() -> None:
     try:
         import torch
         from datasets import load_dataset
-        from trl import SFTConfig, SFTTrainer
         from unsloth import FastLanguageModel
+        from trl import SFTConfig, SFTTrainer
     except ImportError as exc:
         raise SystemExit(
             "Install current Unsloth, transformers v5, datasets and TRL "

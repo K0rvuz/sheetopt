@@ -101,7 +101,7 @@ def _evidence_problems(proposal: AIProposal, packet: dict[str, Any]) -> tuple[li
             "Limite de intervalo exige política para novas linhas e benchmark na cópia."
         )
 
-    if any(re.search(r"source_ids\s*:\s*\[", step, re.I)
+    if any(re.search(r"source_ids\s*:\s*\[", step, re.IGNORECASE)
            for step in proposal.validation_steps):
         problems.append("Saída do modelo contém fragmento de JSON em etapa de validação.")
 

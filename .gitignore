@@ -16,3 +16,7 @@ credentials/
 .DS_Store
 .vscode/
 .idea/
+
+# Generated local training sets and adapters: do not publish user-supplied corpora.
+artifacts/
+*.safetensors

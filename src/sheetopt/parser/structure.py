@@ -11,7 +11,7 @@ from dataclasses import dataclass
 _FUNC = re.compile(r"(?<![A-Za-z0-9_.])([A-Za-z_][A-Za-z0-9_.]*)\s*\(")
 _OPEN = re.compile(
     r"(?:REF_SHEET!|(?:'(?:[^']|'')+'|[A-Za-z_][A-Za-z0-9_.]*)!)?"
-    r"\$?[A-Z]{1,3}:\$?[A-Z]{1,3}(?![A-Za-z0-9_])", re.I
+    r"\$?[A-Z]{1,3}:\$?[A-Z]{1,3}(?![A-Za-z0-9_])", re.IGNORECASE
 )
 _VOLATILE = {"TODAY", "NOW", "RAND", "RANDBETWEEN"}
 
@@ -103,7 +103,7 @@ def inspect_formula_shape(formula: str) -> FormulaStructure:
     valid = None
     complete = False
     # Only a top-level SUMIFS/COUNTIFS call qualifies for structural analysis.
-    match = re.match(r"^=\s*(SUMIFS|COUNTIFS)\s*\(", masked, flags=re.I)
+    match = re.match(r"^=\s*(SUMIFS|COUNTIFS)\s*\(", masked, flags=re.IGNORECASE)
     if match and formula.rstrip().endswith(")"):
         aggregate = match.group(1).upper()
         start = match.end()

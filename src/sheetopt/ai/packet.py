@@ -15,9 +15,9 @@ from sheetopt.context.engine import build_report_context, select_context_packet
 from sheetopt.context.formula_samples import sanitise_formula
 from sheetopt.knowledge.retrieval import knowledge_for_diagnostic
 from sheetopt.knowledge.rules import retrieve_rules
-from sheetopt.parser.structure import inspect_formula_shape
 from sheetopt.models import AnalysisReport
 from sheetopt.optimizer.aggregation_planner import plan_aggregations
+from sheetopt.parser.structure import inspect_formula_shape
 
 MAX_PACKET_CHARS = 16000
 LOCAL_FRIENDLY_PACKET_CHARS = 4600
