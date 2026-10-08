@@ -155,6 +155,12 @@ def build_ai_analysis_pdf(export_data: AIAnalysisExport) -> bytes:
         if proposal.target_sheets:
             block("Abas citadas: " + ", ".join(proposal.target_sheets), style="small")
         block(proposal.rationale)
+        block("Verificação determinística: " + proposal.evidence_status, style="small")
+        for reason in proposal.evidence_reasons:
+            block("• " + reason, style="small", limit=500)
+        if proposal.evidence_rules:
+            block("Regras de conhecimento consultadas: " +
+                  ", ".join(proposal.evidence_rules), style="small")
         if proposal.validation_steps:
             block("Validações obrigatórias antes de qualquer alteração:", style="small")
             for step in proposal.validation_steps:

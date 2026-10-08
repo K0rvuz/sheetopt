@@ -264,3 +264,17 @@ verificações exigidas, dúvidas, documentação citada e o contexto revisado
 que foi enviado ao modelo, sem segredos ou conteúdo bruto da planilha.
 O PDF é gerado localmente sem repetir a chamada ao modelo. Consulte
 [o guia de exportação](docs/EXPORTACAO-ANALISE-IA.md).
+
+## Evidências verificáveis e conhecimento Google Sheets
+
+A análise por IA agora passa por uma **verificação determinística posterior**:
+comparação das recomendações com amostras de fórmulas e referências
+documentais. Propostas sem sustentação são rotuladas como **Evidência
+insuficiente — não executar**, mantendo todas as alterações bloqueadas.
+Consulte [Conhecimento, fine-tuning e validação](docs/04-TREINAMENTO-E-VALIDACAO.md).
+
+**RAG/documentação disponível no contexto não altera os pesos do modelo.**
+O projeto inclui um pipeline experimental que prepara dados com proveniência
+para **treinamento supervisionado LoRA real em GPU externa**. Ainda não houve
+fine-tuning do Qwen nem benchmark comprovando melhora do modelo; o conjunto
+inicial de regras é pequeno e o próprio pipeline impede treino prematuro.

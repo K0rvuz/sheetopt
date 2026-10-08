@@ -14,6 +14,8 @@ from typing import Any
 from sheetopt.context.engine import build_report_context, select_context_packet
 from sheetopt.context.formula_samples import sanitise_formula
 from sheetopt.knowledge.retrieval import knowledge_for_diagnostic
+from sheetopt.knowledge.rules import retrieve_rules
+from sheetopt.parser.structure import inspect_formula_shape
 from sheetopt.models import AnalysisReport
 from sheetopt.optimizer.aggregation_planner import plan_aggregations
 
@@ -44,6 +46,7 @@ def _compact_packet(packet: dict[str, Any]) -> dict[str, Any]:
     packet["cross_sheet_edges"] = packet["cross_sheet_edges"][:8]
     packet["hotspots"] = packet["hotspots"][:5]
     packet["aggregation_review_candidates"] = packet["aggregation_review_candidates"][:4]
+    packet["documented_constraints"] = packet["documented_constraints"][:3]
     packet["functions"] = dict(list(packet["functions"].items())[:8])
 
     if _packet_chars(packet) > LOCAL_FRIENDLY_PACKET_CHARS:
@@ -51,6 +54,7 @@ def _compact_packet(packet: dict[str, Any]) -> dict[str, Any]:
             if len(doc.get("guidance", "")) > 210:
                 doc["guidance"] = doc["guidance"][:207] + "..."
         packet["cross_sheet_edges"] = packet["cross_sheet_edges"][:5]
+        packet["documented_constraints"] = packet["documented_constraints"][:2]
         packet["hotspots"] = packet["hotspots"][:4]
         packet["aggregation_review_candidates"] = packet["aggregation_review_candidates"][:3]
 
@@ -61,6 +65,8 @@ def _compact_packet(packet: dict[str, Any]) -> dict[str, Any]:
                 sample["formula_shape"] = shape[:225]
                 sample["shape_truncated"] = True
         packet["cross_sheet_edges"] = packet["cross_sheet_edges"][:4]
+        for constraint in packet["documented_constraints"]:
+            constraint["claim"] = constraint["claim"][:140]
         packet["aggregation_review_candidates"] = packet["aggregation_review_candidates"][:2]
         packet["functions"] = dict(list(packet["functions"].items())[:6])
 
@@ -74,6 +80,7 @@ def _compact_packet(packet: dict[str, Any]) -> dict[str, Any]:
         packet["cross_sheet_edges"] = packet["cross_sheet_edges"][:2]
         packet["hotspots"] = packet["hotspots"][:3]
         packet["aggregation_review_candidates"] = packet["aggregation_review_candidates"][:1]
+        packet["documented_constraints"] = packet["documented_constraints"][:1]
 
     if _packet_chars(packet) > LOCAL_FRIENDLY_PACKET_CHARS:
         # Worst-case packets can contain six unusually long sample shapes.
@@ -247,9 +254,30 @@ def build_ai_packet(
                 "formula_shape": cleaned,
                 "scope": "sampled_cell_not_all_formulas",
             })
+    # Curated, source-traceable technical constraints. Only local sample
+    # structures produce local claims; otherwise these remain general facts.
+    observed_terms: set[str] = set()
+    for sample in samples:
+        structure = inspect_formula_shape(sample["formula_shape"])
+        observed_terms.update(structure.functions)
+        if structure.open_ranges:
+            observed_terms.update({"full-column", "range"})
+    if groups:
+        observed_terms.update({"SUMIFS", "QUERY"})
+    rules = retrieve_rules(observed_terms, limit=4) if observed_terms else []
+    documented_constraints = [
+        {
+            "rule_id": rule["id"], "claim": rule["claim"][:240],
+            "requires": rule["requires"][:5],
+            "source_id": rule["source_id"],
+            "scope": "documentation_rule_not_proof_of_local_formula",
+        }
+        for rule in rules
+    ]
     packet: dict[str, Any] = {
         "investigation": investigation,
         "knowledge_sources": sources,
+        "documented_constraints": documented_constraints,
         "packet_version": 1,
         "coverage": selected["coverage"],
         "focus_sheet": alias(focus_sheet) if focus_sheet else None,

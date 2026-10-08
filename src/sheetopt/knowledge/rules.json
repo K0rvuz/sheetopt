@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "editorial_policy": "Reviewed, concise factual propositions grounded in official Google documentation. NOT an official Google corpus, NOT trained weights. Original sources must be consulted for changes.",
+  "documents": [
+    {
+      "id": "GS-SUMIFS-ARGS",
+      "kind": "function",
+      "tags": [
+        "SUMIFS",
+        "criteria",
+        "sum",
+        "range"
+      ],
+      "claim": "SUMIFS soma um intervalo apenas nas linhas que satisfazem todos os critérios; exige pares intervalo-de-critérios/critério.",
+      "requires": [
+        "sum_range",
+        "criterion_pairs"
+      ],
+      "risk": "high",
+      "source_id": "SHEETS-FUNC-SUMIFS",
+      "url": "https://support.google.com/docs/answer/3238496?hl=en-GB"
+    },
+    {
+      "id": "GS-SUMIFS-SEMANTICS",
+      "kind": "constraint",
+      "tags": [
+        "SUMIFS",
+        "QUERY",
+        "wildcard",
+        "types",
+        "blank"
+      ],
+      "claim": "Trocar SUMIFS por QUERY não demonstra equivalência sem verificar critérios, dados heterogêneos, cabeçalhos, datas, erros, curinga e atualização.",
+      "requires": [
+        "criteria_semantics",
+        "data_types",
+        "null_cases",
+        "date_cases",
+        "new_rows"
+      ],
+      "risk": "high",
+      "source_id": "SHEETS-FUNC-SUMIFS",
+      "url": "https://support.google.com/docs/answer/3238496?hl=en-GB"
+    },
+    {
+      "id": "GS-SUMIF-WILDCARDS",
+      "kind": "function",
+      "tags": [
+        "SUMIF",
+        "SUMIFS",
+        "wildcard",
+        "criteria"
+      ],
+      "claim": "Critérios textuais em SUMIF podem usar curingas * e ?; ~ escapa caracteres especiais.",
+      "requires": [
+        "string_criteria"
+      ],
+      "risk": "medium",
+      "source_id": "SHEETS-FUNC-SUMIF",
+      "url": "https://support.google.com/docs/answer/3093583?hl=pt-BR"
+    },
+    {
+      "id": "GS-QUERY-COLUMN-TYPES",
+      "kind": "function",
+      "tags": [
+        "QUERY",
+        "mixed",
+        "types",
+        "null",
+        "SUMIFS"
+      ],
+      "claim": "QUERY trata valores de tipos minoritários como nulos quando uma coluna contém tipos mistos.",
+      "requires": [
+        "column_types"
+      ],
+      "risk": "high",
+      "source_id": "SHEETS-FUNC-QUERY",
+      "url": "https://support.google.com/docs/answer/3093343?hl=pt-BR"
+    },
+    {
+      "id": "GS-QUERY-HEADERS",
+      "kind": "function",
+      "tags": [
+        "QUERY",
+        "headers",
+        "group"
+      ],
+      "claim": "O parâmetro de cabeçalhos de QUERY altera sua interpretação; se omitido, o valor pode ser inferido.",
+      "requires": [
+        "header_rows"
+      ],
+      "risk": "high",
+      "source_id": "SHEETS-FUNC-QUERY",
+      "url": "https://support.google.com/docs/answer/3093343?hl=pt-BR"
+    },
+    {
+      "id": "GS-OPEN-RANGES",
+      "kind": "performance",
+      "tags": [
+        "range",
+        "SUMIFS",
+        "COUNTIFS",
+        "full-column",
+        "open"
+      ],
+      "claim": "Intervalos abertos podem incluir muitas células vazias; limites explícitos podem reduzir trabalho, mas demandam política para novas linhas.",
+      "requires": [
+        "last_row",
+        "growth_policy"
+      ],
+      "risk": "high",
+      "source_id": "SHEETS-PERF-002",
+      "url": "https://support.google.com/docs/answer/12159115?hl=pt-BR"
+    },
+    {
+      "id": "GS-VOLATILE-REF",
+      "kind": "performance",
+      "tags": [
+        "TODAY",
+        "NOW",
+        "RAND",
+        "volatile"
+      ],
+      "claim": "TODAY e NOW são voláteis; reutilizar uma célula de referência preservando a atualização pode evitar cálculos repetidos. Substituir por data fixa altera a semântica.",
+      "requires": [
+        "local_volatile_formula",
+        "refresh_policy"
+      ],
+      "risk": "high",
+      "source_id": "SHEETS-PERF-002",
+      "url": "https://support.google.com/docs/answer/12159115?hl=pt-BR"
+    },
+    {
+      "id": "GS-LONG-CHAINS",
+      "kind": "performance",
+      "tags": [
+        "dependency",
+        "chain",
+        "reference"
+      ],
+      "claim": "Cadeias longas de dependência atrasam o cálculo das células descendentes; referências diretas podem reduzi-las quando equivalentes.",
+      "requires": [
+        "dependency_chain"
+      ],
+      "risk": "medium",
+      "source_id": "SHEETS-PERF-002",
+      "url": "https://support.google.com/docs/answer/12159115?hl=pt-BR"
+    },
+    {
+      "id": "GS-CROSS-DOC-IMPORTS",
+      "kind": "performance",
+      "tags": [
+        "IMPORTRANGE",
+        "IMPORTXML",
+        "IMPORTDATA",
+        "IMPORTHTML"
+      ],
+      "claim": "Funções IMPORT entre arquivos dependem de transferência de dados e podem introduzir atraso de rede.",
+      "requires": [
+        "external_import"
+      ],
+      "risk": "medium",
+      "source_id": "SHEETS-PERF-002",
+      "url": "https://support.google.com/docs/answer/12159115?hl=pt-BR"
+    },
+    {
+      "id": "GS-LET-EVAL",
+      "kind": "function",
+      "tags": [
+        "LET",
+        "subexpression",
+        "cache"
+      ],
+      "claim": "LET avalia uma expressão atribuída a um nome uma vez no seu escopo, sem por si só provar melhora da planilha.",
+      "requires": [
+        "repeated_expression"
+      ],
+      "risk": "medium",
+      "source_id": "SHEETS-FUNC-LET",
+      "url": "https://support.google.com/docs/answer/13190535?hl=pt-BR"
+    },
+    {
+      "id": "GS-API-FORMULAS",
+      "kind": "api",
+      "tags": [
+        "api",
+        "FORMULA",
+        "values",
+        "batchGet"
+      ],
+      "claim": "values.batchGet permite ler intervalos específicos com renderização FORMULA, distinta de valores formatados.",
+      "requires": [
+        "a1_ranges"
+      ],
+      "risk": "low",
+      "source_id": "SHEETS-API-VALUES",
+      "url": "https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/batchGet"
+    },
+    {
+      "id": "GS-API-BATCH",
+      "kind": "api",
+      "tags": [
+        "api",
+        "batchUpdate",
+        "clone"
+      ],
+      "claim": "spreadsheets.batchUpdate valida e executa solicitações de um lote atomicamente; equivalência de fórmulas precisa de testes adicionais.",
+      "requires": [
+        "validated_clone"
+      ],
+      "risk": "high",
+      "source_id": "SHEETS-API-BATCH",
+      "url": "https://developers.google.com/workspace/sheets/api/guides/batch"
+    }
+  ]
+}

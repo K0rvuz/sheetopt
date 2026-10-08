@@ -73,6 +73,10 @@ class AIProposal(BaseModel):
     target_sheets: list[str] = Field(default_factory=list, max_length=5)
     validation_steps: list[str] = Field(min_length=1, max_length=7)
     source_ids: list[str] = Field(default_factory=list, max_length=5)
+    # Deterministic gate sets these after inference.
+    evidence_status: str = "unreviewed"
+    evidence_reasons: list[str] = Field(default_factory=list, max_length=7)
+    evidence_rules: list[str] = Field(default_factory=list, max_length=4)
 
 
 class AIAnalysis(BaseModel):

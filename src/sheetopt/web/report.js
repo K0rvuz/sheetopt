@@ -564,6 +564,25 @@
           section.append($node("summary", proposal.title));
           const inner = $node("div", null, "report-group-body");
           inner.append($node("p", proposal.rationale, "muted"));
+          if (proposal.evidence_status) {
+            const classification = proposal.evidence_status === "needs_evidence"
+              ? "Evidência insuficiente — não executar"
+              : "Investigação fundamentada — ainda requer testes";
+            inner.append($node("p", "Validador: " + classification,
+              proposal.evidence_status === "needs_evidence" ? "warning" : "muted"));
+          }
+          if (proposal.evidence_reasons?.length) {
+            const reasons = $node("ul");
+            for (const reason of proposal.evidence_reasons) {
+              reasons.append($node("li", reason));
+            }
+            inner.append($node("strong", "Limitações detectadas"));
+            inner.append(reasons);
+          }
+          if (proposal.evidence_rules?.length) {
+            inner.append($node("p", "Regras documentais: " +
+              proposal.evidence_rules.join(", "), "muted"));
+          }
           inner.append($node("p",
             "Impacto estimado: " + proposal.impact +
             " · Risco: " + proposal.risk +

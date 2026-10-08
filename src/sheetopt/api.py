@@ -14,6 +14,7 @@ from googleapiclient.errors import HttpError
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from sheetopt import __version__
+from sheetopt.ai.evidence_gate import review_ai_analysis
 from sheetopt.ai.packet import build_ai_packet
 from sheetopt.ai.provider import AIProviderError, infer_suggestions
 from sheetopt.context.engine import build_report_context
@@ -415,6 +416,7 @@ def ai_context_suggestions(data: AIContextRequest) -> dict[str, Any]:
             detail="AI provider unavailable or returned invalid structured suggestions. "
                    "Check provider settings and connection.",
         ) from exc
+    suggestions = review_ai_analysis(suggestions, packet)
     return {
         "status": "unverified_suggestions",
         "source": "ai",
