@@ -54,7 +54,7 @@ def main() -> None:
 
     try:
         # Unsloth must patch model kernels before TRL imports transformers.
-        from unsloth import FastLanguageModel  # noqa: I001
+        from unsloth import FastLanguageModel
         import torch
         from datasets import load_dataset
         from trl import SFTConfig, SFTTrainer
