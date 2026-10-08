@@ -8,6 +8,7 @@ from sheetopt.analysis.analyzer import analyze_snapshot
 from sheetopt.google.auth import credentials_from_info, drive_service, sheets_service
 from sheetopt.google.drive import clone_spreadsheet
 from sheetopt.google.sheets import read_workbook
+from sheetopt.optimizer.let_cache import find_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ def inspect_and_clone(
         "optimization_count": 0,
         "merge_available": False,
         "events": events,
+        "optimization_candidates": [],
     }
     # Avoid creating unnecessary Drive copies of formula-free workbooks.
     if make_clone and snapshot.formulas:
@@ -67,6 +69,9 @@ def inspect_and_clone(
             })
         else:
             result["status"] = "cloned_not_optimized"
+            # The first experimental rule targets only simple repeated scalar
+            # aggregates; never expose hundreds of thousands of raw formulas.
+            result["optimization_candidates"] = find_candidates(snapshot.formulas, limit=5)
             events.append({
                 "stage": "copy", "status": "completed",
                 "duration_ms": round((time.perf_counter() - begin) * 1000),

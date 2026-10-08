@@ -153,6 +153,75 @@
     details.append(content);
     container.append(details);
   }
+  function renderCandidates(root, result, token) {
+    const candidates = result.optimization_candidates || [];
+    if (!result.clone) return;
+    const block = $node("details", null, "report-details");
+    block.append($node("summary",
+      "Otimizações experimentais na cópia · " + quantity(candidates.length)
+    ));
+    const text = $node("p", candidates.length
+      ? "Primeira regra: duplicação de agregações escalares idênticas na mesma fórmula. " +
+        "O teste altera uma célula da CÓPIA, compara valor e formatos, e reverte em caso de divergência. " +
+        "Isso não valida a planilha inteira e não mede aceleração."
+      : "Nenhuma fórmula corresponde à regra experimental OPT-LET-001. " +
+        "O motor ainda não corrige os alertas PERF-003 de colunas inteiras.");
+    text.className = "muted";
+    block.append(text);
+    const cloneId = result.clone.id;
+    for (const candidate of candidates) {
+      const item = $node("div", null, "finding");
+      item.append($node("strong", candidate.rule_id + " · " + candidate.a1));
+      item.append($node("p", candidate.description, "muted"));
+      const pair = $node("details", null, "finding-extra");
+      pair.append($node("summary", "Ver fórmulas antes/depois"));
+      pair.append($node("pre", "ANTES: " + candidate.before + "\n\nDEPOIS: " + candidate.after, "formula-diff"));
+      item.append(pair);
+      const response = $node("p", "Ainda não testada.", "muted");
+      addButton(item, "Testar alteração na cópia", async (event) => {
+        if (!window.confirm(
+          "Este teste alterará UMA célula apenas da cópia e tentará revertê-la se houver divergência. Continuar?"
+        )) return;
+        const button = event.currentTarget;
+        button.disabled = true;
+        button.textContent = "Validando...";
+        try {
+          const apiResponse = await fetch("/v1/optimizations/test", {
+            method: "POST",
+            headers: {
+              "Authorization": "Bearer " + token,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({clone_id: cloneId, candidate_id: candidate.id}),
+            cache: "no-store"
+          });
+          const payload = await apiResponse.json().catch(() => ({}));
+          if (!apiResponse.ok) {
+            throw new Error(typeof payload.detail === "string"
+              ? payload.detail : "Não foi possível testar a alteração (HTTP " + apiResponse.status + ").");
+          }
+          const messages = {
+            validated_cell_only: "Célula validada localmente na cópia (sem medição de performance).",
+            rejected: "Proposta rejeitada; nenhuma fórmula modificada.",
+            reverted: "Validação falhou; a fórmula anterior foi restaurada na cópia.",
+            manual_review_required: "ALERTA: estado da cópia não confirmado. Verifique manualmente."
+          };
+          response.textContent = (messages[payload.status] || payload.status) +
+            " " + (payload.message || payload.reason || "");
+          response.className = payload.status === "manual_review_required" ? "warning" : "muted";
+          button.textContent = "Teste encerrado";
+        } catch (error) {
+          response.textContent = "Resultado incerto: " + error.message +
+            " Verifique a cópia antes de qualquer nova tentativa.";
+          response.className = "warning";
+          button.textContent = "Rever cópia";
+        }
+      });
+      item.append(response);
+      block.append(item);
+    }
+    root.append(block);
+  }
   function renderReport(result, token) {
     const report = result.report;
     const root = document.getElementById("results");
@@ -295,6 +364,7 @@
       }
     });
     root.append(detail);
+    renderCandidates(root, result, token);
     root.scrollIntoView({behavior: "smooth", block: "start"});
   }
   window.SheetOptReports = { renderReport };

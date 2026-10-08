@@ -44,3 +44,5 @@
 .finding-locations{font-size:11px;color:#8ba0b9;overflow-wrap:anywhere}
 .clone-link{display:inline-block;margin:8px 0}
 @media(max-width:700px){.report-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.report-header{display:block}.report-summary-note{max-width:none}.report-group>summary{font-size:12px}}
+
+.formula-diff{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;overflow:auto;padding:13px;background:#080f17;border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere;color:#b1dacf;max-height:260px}

@@ -23,6 +23,8 @@ from sheetopt.google.oauth import (
     store_oauth_client,
 )
 from sheetopt.google.sheets import extract_spreadsheet_id
+from sheetopt.google.auth import sheets_service
+from sheetopt.optimizer.validate import test_candidate_on_clone
 from sheetopt.models import AnalysisReport
 from sheetopt.reports.pdf import build_report_pdf
 from sheetopt.secrets_store import get_secret, put_secret
@@ -36,6 +38,11 @@ _WEB_DIR = Path(__file__).resolve().parent / "web"
 
 class AnalyzeRequest(BaseModel):
     spreadsheet_url: str = Field(min_length=20, max_length=2048)
+
+
+class ValidateCandidateRequest(BaseModel):
+    clone_id: str = Field(pattern=r"^[A-Za-z0-9_-]{20,}$")
+    candidate_id: str = Field(pattern=r"^[a-f0-9]{24}$")
 
 
 class AISettings(BaseModel):
@@ -224,6 +231,55 @@ def analyze(request: AnalyzeRequest) -> AnalysisReport:
     return response["report"]
 
 
+@app.post("/v1/optimizations/test", dependencies=[Depends(require_admin)])
+def validate_optimization_candidate(request: ValidateCandidateRequest) -> dict[str, Any]:
+    # Plans are server-side, generated from a copy created by SheetOpt.
+    # Never trust a client-supplied spreadsheet ID as a writable target.
+    plan = get_secret("optimizer-plan-" + request.clone_id)
+    if not plan or plan.get("clone_id") != request.clone_id:
+        raise HTTPException(status_code=404, detail="Cópia de trabalho não registrada nesta instalação.")
+    match = next(
+        (item for item in plan.get("candidates", []) if item.get("id") == request.candidate_id),
+        None,
+    )
+    if match is None:
+        raise HTTPException(status_code=404, detail="Proposta não encontrada.")
+    if request.candidate_id in plan.get("tested", []):
+        raise HTTPException(status_code=409, detail="Proposta já testada. Crie uma nova cópia.")
+    # Mark consumed before any write. Replaying after a timeout is unsafe.
+    plan["tested"] = [*plan.get("tested", []), request.candidate_id]
+    put_secret("optimizer-plan-" + request.clone_id, plan)
+    active = (get_secret("google_auth_mode") or {}).get("mode")
+    service_info = get_secret("google")
+    if active == "oauth":
+        credentials = oauth_credentials()
+    elif service_info:
+        credentials = credentials_from_info(service_info)
+    else:
+        raise HTTPException(status_code=409, detail="Conecte sua conta Google primeiro.")
+    try:
+        result = test_candidate_on_clone(
+            sheets_service(credentials),
+            original_id=plan["original_id"],
+            clone_id=request.clone_id,
+            candidate=match,
+        )
+        return result
+    except (HttpError, TimeoutError, OSError, RuntimeError, ValueError, KeyError) as exc:
+        logger.warning("Clone-only optimization encountered %s", type(exc).__name__)
+        # A write timeout can have an unknown outcome: never retry automatically.
+        raise HTTPException(
+            status_code=502,
+            detail="Falha na operação. Verifique a célula da cópia antes de tentar novamente.",
+        ) from exc
+    finally:
+        if active == "oauth":
+            try:
+                persist_oauth_credentials(credentials)
+            except (HTTPException, sqlite3.Error, RuntimeError, ValueError, TypeError, OSError):
+                logger.warning("Could not persist refreshed OAuth token after clone-only test")
+
+
 @app.post("/v1/workbooks/analyze", dependencies=[Depends(require_admin)])
 def analyze_workbook(request: AnalyzeRequest) -> dict[str, Any]:
     return _analyze(request, clone=True)
@@ -247,6 +303,22 @@ def _analyze(request: AnalyzeRequest, *, clone: bool) -> dict[str, Any]:
             request.spreadsheet_url, service_info, credentials=credentials, make_clone=clone
         )
         # Never include spreadsheet IDs, formulas or tokens in application logs.
+        if result["clone"] and result.get("optimization_candidates"):
+            clone_id = result["clone"]["id"]
+            try:
+                put_secret(
+                    "optimizer-plan-" + clone_id,
+                    {
+                        "original_id": result["report"].spreadsheet_id,
+                        "clone_id": clone_id,
+                        "candidates": result["optimization_candidates"],
+                        "tested": [],
+                    },
+                )
+            except (HTTPException, sqlite3.Error, OSError, ValueError):
+                # Do not lose a completed copy/diagnostic if local storage fails.
+                result["optimization_candidates"] = []
+                logger.warning("Could not save clone optimization plan")
         logger.info(
             "SheetOpt diagnostic completed: status=%s, findings=%d, cloned=%s",
             result["status"],

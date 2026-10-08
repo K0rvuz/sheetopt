@@ -110,3 +110,34 @@ pieces of formulas.
 
 All findings are diagnostic only. Performance improvement and safe
 formula rewrites must be validated and measured in later work.
+
+## Experimental clone-only optimization (OPT-LET-001)
+
+The analysis now discovers up to five **very conservatively matched** scalar
+formulas with the form `=SUMIFS(...)+SUMIFS(...)` (or the supported simple
+SUM/COUNT/AVERAGEIF variants) where both function calls are identical. The
+experimental rewrite uses Google's `LET` to cache the shared calculation
+without replacing addition by multiplication. Nested functions and uncertain
+syntax are intentionally excluded. See Google's LET documentation for its
+evaluate-once behavior.
+
+After **Analisar e criar cópia**, expand **Otimizações experimentais na cópia**
+to review candidates. With explicit confirmation the backend:
+
+1. Checks that the clone ID and candidate were generated and saved by SheetOpt.
+2. Reads the original and cloned *target cell* and verifies the formula, values,
+   types, displayed value, relevant formatting and validation metadata match.
+3. Writes **one formula to the clone only** using Google Sheets batchUpdate.
+4. Re-reads the clone target cell and compares with the baseline. On mismatch,
+   it attempts to restore the old formula in the clone.
+5. Reports `validated_cell_only`, `rejected`, `reverted`, or
+   `manual_review_required` if rollback or write outcome cannot be confirmed.
+
+Successful local verification is **not** an optimization performance
+measurement nor proof of full-workbook equivalence. Downstream dependents,
+recalculation timing, named-range collisions, volatility triggered by
+dependencies, concurrent editors, locale restrictions, and future input
+changes require more work. The original is never modified and merge remains
+disabled. Changes on the clone can be inspected manually. There is no
+automatic retry after an ambiguous write. This is an experimental foundation,
+not a general purpose correction of PERF-003 findings.
