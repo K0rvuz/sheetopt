@@ -11,9 +11,9 @@ from collections import Counter
 from typing import Any
 
 from sheetopt.context.engine import build_report_context, select_context_packet
+from sheetopt.knowledge.retrieval import knowledge_for_diagnostic
 from sheetopt.models import AnalysisReport
 from sheetopt.optimizer.aggregation_planner import plan_aggregations
-from sheetopt.knowledge.retrieval import knowledge_for_diagnostic
 
 MAX_PACKET_CHARS = 16000
 

@@ -18,7 +18,6 @@ from sheetopt.ai.packet import build_ai_packet
 from sheetopt.ai.provider import infer_suggestions
 from sheetopt.context.engine import build_report_context
 from sheetopt.evidence.trials import list_trials, outcome_summary, record_trial
-from sheetopt.knowledge.retrieval import all_documents, search_knowledge
 from sheetopt.google.auth import credentials_from_info, sheets_service
 from sheetopt.google.oauth import (
     complete_oauth,
@@ -30,6 +29,7 @@ from sheetopt.google.oauth import (
     store_oauth_client,
 )
 from sheetopt.google.sheets import extract_spreadsheet_id
+from sheetopt.knowledge.retrieval import all_documents, search_knowledge
 from sheetopt.models import AnalysisReport
 from sheetopt.optimizer.aggregation_planner import plan_aggregations
 from sheetopt.optimizer.validate import test_candidate_on_clone
