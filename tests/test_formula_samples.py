@@ -48,7 +48,7 @@ def _context() -> dict:
              "possible_headers": []},
         ],
         "edges": [], "hotspots": [], "schema_version": 1,
-        "sheet_count": 2, "formula_count": 3000,
+        "sheet_count": 2, "formula_count": 3000, "limitations": [],
     }
 
 

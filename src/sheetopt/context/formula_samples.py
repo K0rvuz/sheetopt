@@ -88,8 +88,6 @@ def sanitise_formula(formula: str) -> str:
     # Protect quoted placeholders before masking identifiers.
     code = masked.split('"<TEXT>"')
     for index, part in enumerate(code):
-        if index % 2:
-            continue
         part = re.sub(
             r"(?<![A-Za-z0-9_.])\$?[A-Z]{1,3}\$?[1-9][0-9]{0,6}"
             r"(?![A-Za-z0-9_.])|"
