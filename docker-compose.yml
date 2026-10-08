@@ -2,8 +2,16 @@ services:
   sheetopt:
     build: .
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
-      SHEETOPT_GOOGLE_CREDENTIALS: /run/secrets/google-service-account.json
+      SHEETOPT_ADMIN_TOKEN: ${SHEETOPT_ADMIN_TOKEN:?Set a 32+ character admin token in .env}
+      SHEETOPT_ENCRYPTION_KEY: ${SHEETOPT_ENCRYPTION_KEY:?Set a Fernet key in .env}
+      SHEETOPT_DATA_DIR: /data
+      SHEETOPT_GOOGLE_COPY_TIMEOUT_SECONDS: ${SHEETOPT_GOOGLE_COPY_TIMEOUT_SECONDS:-180}
+      SHEETOPT_PUBLIC_BASE_URL: ${SHEETOPT_PUBLIC_BASE_URL:-http://localhost:8080}
     volumes:
-      - ./credentials/service-account.json:/run/secrets/google-service-account.json:ro
+      - sheetopt_data:/data
+    restart: unless-stopped
+
+volumes:
+  sheetopt_data:

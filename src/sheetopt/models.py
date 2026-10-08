@@ -30,6 +30,7 @@ class WorkbookSnapshot(BaseModel):
     title: str
     sheets: list[str]
     formulas: list[FormulaCell]
+    sheet_headers: dict[str, list[str]] = Field(default_factory=dict)
 
     @property
     def formula_count(self) -> int:

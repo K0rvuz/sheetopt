@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SheetOpt | Otimização de planilhas</title>
+  <link rel="stylesheet" href="/ui.css">
+  <script src="/report.js" defer></script>
+  <script src="/ui.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-icon">S</span><div>SheetOpt<small>Google Sheets optimizer</small></div></div>
+      <div class="sidebar-label">WORKSPACE LOCAL</div>
+      <nav>
+        <a href="#analyze">▦ <span>Analisar planilha</span></a>
+        <a href="#google">⚙ <span>Credenciais Google</span></a>
+        <a href="#ai">✧ <span>Inteligência artificial</span></a>
+      </nav>
+      <div class="side-note">v0.2 · Diagnóstico e clone<br>As otimizações e o merge estarão disponíveis após o motor de validação.</div>
+    </aside>
+    <main>
+      <header><span class="eyebrow">SHEETOPT / WORKSPACE</span><span class="pill">Instalação self-hosted</span></header>
+      <section id="login" class="panel">
+        <h1>Acessar SheetOpt</h1>
+        <p>Insira o token de administrador definido no Docker. Ele não será enviado a outros serviços.</p>
+        <form id="login-form">
+          <label for="token">Token de administrador</label>
+          <input id="token" type="password" required minlength="32" autocomplete="off" placeholder="SHEETOPT_ADMIN_TOKEN">
+          <button type="submit">Entrar</button>
+        </form>
+      </section>
+      <div id="workspace" hidden>
+        <div class="intro"><h1>Otimize com segurança.</h1><p>Conecte sua planilha, identifique gargalos e gere uma cópia íntegra antes de qualquer transformação.</p></div>
+        <div class="cards">
+          <div class="metric"><span>Google</span><strong id="google-status">Não configurado</strong></div>
+          <div class="metric"><span>IA opcional</span><strong id="ai-status">Desativada</strong></div>
+          <div class="metric"><span>Modo de execução</span><strong>Sem alterações no original</strong></div>
+        </div>
+        <section id="analyze" class="panel">
+          <div class="heading"><div><span class="eyebrow">01 / ANÁLISE</span><h2>Selecionar planilha</h2></div><span class="pill">Cópia protegida</span></div>
+          <p>Informe a URL de uma planilha acessível à conta Google conectada ou à Service Account selecionada.</p>
+          <form id="analyze-form">
+            <label for="spreadsheet">Link ou ID da planilha</label>
+            <input id="spreadsheet" required maxlength="2048" placeholder="https://docs.google.com/spreadsheets/d/.../edit">
+            <button type="submit">Analisar e criar cópia</button>
+            <button id="diagnose-only" type="button" class="secondary">Somente diagnosticar (sem cópia)</button>
+          </form>
+          <details class="report-timeline">
+            <summary>Já tenho um diagnóstico JSON salvo</summary>
+            <p>Reabra um diagnóstico anterior e gere propostas de consolidação sem acessar o Google.</p>
+            <form id="import-report-form">
+              <label for="report-json-file">Arquivo sheetopt-diagnostico.json</label>
+              <input id="report-json-file" type="file" accept=".json,application/json" required>
+              <button type="submit" class="secondary">Importar e preparar propostas</button>
+            </form>
+          </details>
+          <div id="results" hidden class="results" aria-live="polite"></div>
+        </section>
+        <section id="google" class="panel">
+          <div class="heading"><div><span class="eyebrow">02 / CONEXÃO</span><h2>Credenciais Google</h2></div></div>
+          <h3>Minha conta Google (OAuth 2.0)</h3>
+          <p>Use o JSON OAuth baixado do Google Cloud Console (tipo Aplicativo da Web ou Desktop). Depois autorize a conta em uma janela Google.</p>
+          <p class="warning">Para clientes Web, cadastre <code>http://localhost:8080/auth/google/callback</code> nos URIs de redirecionamento autorizados do Google Cloud (ou use o endereço configurado no servidor). Para Desktop, o SheetOpt usa o retorno local em 127.0.0.1.</p>
+          <form id="google-oauth-form">
+            <label for="google-oauth-file">Arquivo JSON OAuth (client_secret_*.json)</label>
+            <input id="google-oauth-file" type="file" accept=".json,application/json" required>
+            <button type="submit" class="secondary">Salvar cliente OAuth</button>
+          </form>
+          <p id="oauth-redirect" class="muted"></p>
+          <div class="oauth-controls">
+            <button id="google-connect" type="button">Conectar com Google</button>
+            <button id="google-refresh" type="button" class="secondary">Atualizar status</button>
+            <button id="google-disconnect" type="button" class="secondary">Desconectar</button>
+          </div>
+          <p id="oauth-status" class="muted">Nenhuma conta conectada.</p>
+          <hr>
+          <h3>Alternativa: Service Account</h3>
+          <p>Se preferir uma automação por conta de serviço, ative Google Sheets API e Google Drive API e compartilhe a planilha com o e-mail dessa conta.</p>
+          <form id="google-form">
+            <label for="google-file">Arquivo JSON da Service Account</label>
+            <input id="google-file" type="file" accept=".json,application/json" required>
+            <button type="submit" class="secondary">Salvar credenciais da Service Account</button>
+          </form>
+          <p id="google-email" class="muted"></p>
+        </section>
+        <section id="ai" class="panel">
+          <div class="heading"><div><span class="eyebrow">03 / INTELIGÊNCIA</span><h2>Provedor de IA</h2></div><span class="pill">Opcional</span></div>
+          <p>Configure seu modelo externo ou local (API compatível com OpenAI). Após gerar um diagnóstico, você poderá pré-visualizar o contexto e autorizar uma análise por IA. O envio é sempre opcional e nenhuma fórmula será modificada.</p>
+          <form id="ai-form">
+            <label for="ai-provider">Provedor</label>
+            <select id="ai-provider">
+              <option value="disabled">Desativado — apenas regras</option>
+              <option value="external">API externa</option>
+              <option value="local">Servidor local / próprio</option>
+            </select>
+            <div id="ai-extra" hidden>
+              <label for="ai-endpoint">URL base da API</label>
+              <input id="ai-endpoint" placeholder="https://api.exemplo.com/v1">
+              <label for="ai-model">Modelo</label>
+              <input id="ai-model" maxlength="250" placeholder="modelo-de-sua-escolha">
+              <label for="ai-key">API Key (opcional no modo local)</label>
+              <input id="ai-key" type="password" autocomplete="off" placeholder="Chave de API">
+            </div>
+            <button type="submit" class="secondary">Salvar preferências de IA</button>
+          </form>
+        </section>
+        <footer>SheetOpt · Clonagem e diagnóstico são somente a primeira etapa. Nenhuma fórmula é reescrita nesta versão.</footer>
+      </div>
+      <div id="notice" role="status" aria-live="polite"></div>
+    </main>
+  </div>
+</body>
+</html>

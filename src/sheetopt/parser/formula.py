@@ -4,7 +4,9 @@ import re
 
 _FUNCTION_RE = re.compile(r"(?<![A-Z0-9_.])([A-Z][A-Z0-9_.]*)\s*\(", re.IGNORECASE)
 _FULL_COLUMN_RE = re.compile(
-    r"(?:(?:'[^']+'|[A-Za-z_][A-Za-z0-9_.]*)!)?\$?[A-Z]{1,3}:\$?[A-Z]{1,3}",
+    r"(?<![A-Za-z0-9_.])"
+    r"(?:(?:'(?:[^']|'')+'|[A-Za-z_][A-Za-z0-9_.]*)!)?"
+    r"\$?[A-Z]{1,3}:\$?[A-Z]{1,3}(?![A-Za-z0-9_])",
     re.IGNORECASE,
 )
 _CELL_REF_RE = re.compile(
@@ -19,7 +21,21 @@ def extract_functions(formula: str) -> list[str]:
 
 
 def full_column_references(formula: str) -> list[str]:
-    return [match.group(0) for match in _FULL_COLUMN_RE.finditer(formula)]
+    """Return column references, excluding double-quoted formula string literals.
+
+    A full formula parser is still required for safe transformations. This
+    conservative scanner is only used to *report* potential bottlenecks.
+    Preserve offsets while masking strings so original reference text is kept.
+    """
+    masked = re.sub(
+        r'"(?:[^"]|"")*"',
+        lambda match: " " * len(match.group(0)),
+        formula,
+    )
+    return [
+        formula[match.start():match.end()]
+        for match in _FULL_COLUMN_RE.finditer(masked)
+    ]
 
 
 def normalize_formula(formula: str) -> str:
