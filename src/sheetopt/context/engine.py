@@ -27,8 +27,8 @@ _DYNAMIC_RE = re.compile(
 _STRING_RE = re.compile(r'"(?:[^"]|"")*"')
 _LIMITATIONS = [
     "Grafo agregado por aba, somente referências A1 explícitas.",
-    "Não resolve referências locais entre células, intervalos nomeados, "
-    "INDIRECT, importações, resultados de QUERY ou matrizes dinâmicas.",
+    ("Não resolve referências locais entre células, intervalos nomeados, "
+     "INDIRECT, importações, resultados de QUERY ou matrizes dinâmicas."),
     "Cabeçalhos são amostras heurísticas, não um esquema confirmado.",
     "Não há medição de performance nem comprovação de equivalência.",
     "Nenhum dado é enviado para IA; a exportação é local e pode conter nomes internos.",
