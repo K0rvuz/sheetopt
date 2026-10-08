@@ -95,9 +95,9 @@ function setup(fetchImpl) {
     report, context, aggregation_opportunities: [], status: "diagnosed_only",
     events: [], clone: null
   }, "token-only-in-test");
-  const elements = descendants(root);
   const find = (predicate) => {
-    const match = elements.find(predicate);
+    // Newly returned proposals are mounted asynchronously after setup().
+    const match = descendants(root).find(predicate);
     assert.ok(match, "Expected element to exist.");
     return match;
   };
