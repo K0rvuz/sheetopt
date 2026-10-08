@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
@@ -228,7 +229,7 @@ def _analyze(request: AnalyzeRequest, *, clone: bool) -> dict[str, Any]:
             # refresh token and ask for reauthorization if it later expires.
             try:
                 persist_oauth_credentials(credentials)
-            except Exception as exc:
+            except (HTTPException, sqlite3.Error, RuntimeError, ValueError, TypeError, OSError) as exc:
                 logger.warning(
                     "SheetOpt could not persist refreshed OAuth credentials: %s",
                     type(exc).__name__,

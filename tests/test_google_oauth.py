@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sheetopt import api
 from sheetopt.config import settings
 from sheetopt.google import oauth
+from sheetopt.models import AnalysisReport
 from sheetopt.secrets_store import get_secret
 
 
@@ -220,14 +221,21 @@ def test_analysis_returns_report_when_oauth_token_persistence_fails(
     creds = object()
     monkeypatch.setattr(api, "oauth_credentials", lambda: creds)
 
-    class FakeReport:
-        findings = []
+    report = AnalysisReport(
+        spreadsheet_id="x" * 30,
+        title="Example",
+        sheet_count=1,
+        formula_count=1,
+        pattern_count=1,
+        function_counts={},
+        findings=[],
+    )
 
     def successful_copy(link, google_info, *, credentials, make_clone):
         assert credentials is creds
         assert make_clone
         return {
-            "report": FakeReport(),
+            "report": report,
             "clone": {
                 "id": "copy-id",
                 "url": "https://docs.google.com/spreadsheets/d/copy-id/edit",
