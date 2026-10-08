@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
-from sheetopt import api, workflow
+from sheetopt import api
 from sheetopt.config import settings
 from sheetopt.google import oauth
 from sheetopt.secrets_store import get_secret
