@@ -22,3 +22,23 @@ O modelo **ainda não controla ferramentas** para ler intervalos/células extras
 
 ## Critérios de aceitação
 Os quatro modos não fazem chamadas externas; modos direcionais exigem aba; escopo selecionado e hash da prévia devem ser idênticos ao enviado; alteração de escopo invalida consentimento anterior.
+
+## Leitura pontual de exemplos de fórmulas — nova etapa
+A opção **Buscar amostras no Google (somente leitura)** pede autorização
+explícita e escolhe no máximo 6 células dentre os endereços de exemplo dos
+alertas da aba selecionada. A chamada usa somente Sheets API
+`values.batchGet(valueRenderOption=FORMULA)`. Nenhuma célula ou planilha é
+alterada, e nada é enviado ao modelo nessa operação.
+
+O backend devolve somente **formas sanitizadas** das fórmulas,
+substituindo literais textuais, constantes numéricas, nomes de abas e
+identificadores desconhecidos. A sanitização é heurística: o usuário deve
+inspecionar os exemplos antes de autorizar o envio ao modelo.
+A caixa **Incluir amostras sanitizadas na consulta ao modelo** inicia
+desmarcada. Mudá-la invalida a prévia anterior; é necessário aprovar uma nova.
+
+O sistema diferencia explicitamente funções contadas no **documento inteiro**
+das observações em **células de exemplo** da aba. Uma fórmula amostrada não
+representa todas as fórmulas da aba nem prova equivalência.
+Relatórios antigos, células alteradas e abas sem locais elegíveis podem
+não oferecer exemplos. O modelo não recebe acesso livre à planilha.

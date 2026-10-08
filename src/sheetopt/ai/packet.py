@@ -7,10 +7,12 @@ are never part of the packet, even with identifiers enabled.
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from typing import Any
 
 from sheetopt.context.engine import build_report_context, select_context_packet
+from sheetopt.context.formula_samples import sanitise_formula
 from sheetopt.knowledge.retrieval import knowledge_for_diagnostic
 from sheetopt.models import AnalysisReport
 from sheetopt.optimizer.aggregation_planner import plan_aggregations
@@ -33,6 +35,7 @@ def build_ai_packet(
     focus_sheet: str | None = None,
     include_identifiers: bool = False,
     investigation: str = "overview",
+    formula_samples: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build a compact, auditable packet without raw formulas or row data."""
     provided = context if isinstance(context, dict) else build_report_context(report)
@@ -138,6 +141,24 @@ def build_ai_packet(
     # Only rule labels and counts; no normalized formulas or findings messages.
     counts = Counter(f.rule_id for f in report.findings)
     sources = knowledge_for_diagnostic(report.function_counts, dict(counts), focus=focus_sheet)
+    samples = []
+    if formula_samples:
+        if not focus_sheet or len(formula_samples) > 6:
+            raise ValueError("Formula examples require one selected sheet and at most six cells.")
+        for item in formula_samples:
+            if not isinstance(item, dict) or item.get("sheet") != focus_sheet:
+                raise ValueError("Formula samples must belong to the selected sheet.")
+            a1 = str(item.get("a1", ""))
+            source_shape = str(item.get("formula_template", ""))
+            if not re.fullmatch(r"\\$?[A-Z]{1,3}\\$?[1-9][0-9]{0,6}", a1) or len(source_shape) > 460:
+                raise ValueError("Invalid formula example.")
+            cleaned = sanitise_formula(source_shape)
+            samples.append({
+                "sheet": alias(focus_sheet),
+                "cell": a1,
+                "formula_shape": cleaned,
+                "scope": "sampled_cell_not_all_formulas",
+            })
     packet: dict[str, Any] = {
         "investigation": investigation,
         "knowledge_sources": sources,
@@ -148,6 +169,9 @@ def build_ai_packet(
         "sheet_count": report.sheet_count,
         "pattern_count": report.pattern_count,
         "functions": dict(list(report.function_counts.items())[:12]),
+        "functions_scope": "whole_workbook_only_not_selected_sheet",
+        "sampled_formula_examples": samples,
+        "sample_count": len(samples),
         "finding_counts": dict(counts.most_common(8)),
         "sheets": sheets,
         "cross_sheet_edges": edges,
@@ -155,13 +179,15 @@ def build_ai_packet(
         "aggregation_review_candidates": groups,
         "limits": [
             "Explicit cross-sheet references only, not cell dependencies.",
-            "No raw formulas or row values.",
+            "Only user-approved redacted formula shapes are included; no row values.",
+            "Global function counts cannot be attributed to the focused sheet.",
             "Grouped QUERY suggestions are not proven semantically equivalent.",
             "No benchmark or full-workbook validation is available.",
         ],
         "transmission_policy": {
             "identifiers_included": include_identifiers,
             "raw_formulas_included": False,
+            "redacted_formula_shapes_included": bool(samples),
             "row_values_included": False,
             "spreadsheet_id_included": False,
         },

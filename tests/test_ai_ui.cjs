@@ -115,7 +115,7 @@ function setup(fetchImpl) {
 test("AI UI shows scoped checkboxes and remains idle before approval", () => {
   const ui = setup(async () => { throw Error("Unexpected network call"); });
   const checkboxes = descendants(ui.root).filter(x => x.tag === "input" && x.type === "checkbox");
-  assert.equal(checkboxes.length, 2);
+  assert.equal(checkboxes.length, 3);
   for (const checkbox of checkboxes) {
     assert.ok(descendants(ui.root).some(x => x.classList.contains("ai-checkbox") &&
       descendants(x).includes(checkbox)));
@@ -283,4 +283,46 @@ test("complete AI exports preserve the full structured response and preview cont
   assert.equal(postedPDF.context_sha256, file.context_sha256);
   assert.equal(JSON.stringify(postedPDF.analysis), JSON.stringify(file.analysis));
   assert.equal(JSON.stringify(postedPDF.context_packet), JSON.stringify(file.context_packet));
+});
+
+test("formula evidence requires separate Google read and model opt-ins", async () => {
+  const requests = [];
+  const ui = setup(async (url, options) => {
+    requests.push({url, body: JSON.parse(options.body)});
+    if (url === "/v1/ai/formula-samples") {
+      return {ok: true, json: async () => ({
+        examples: [{a1: "C3", formula_template: "=SUMIFS(A:A;B:B;\\"<TEXT>\\")"}],
+        sent_to_ai: false, writes_performed: false
+      })};
+    }
+    if (url === "/v1/ai/preview") {
+      return {ok: true, json: async () => ({
+        preview_hash: "new-hash", packet: {knowledge_sources: []},
+        ready: true, destination: "host.docker.internal", model: "qwen3.5:4b"
+      })};
+    }
+    throw Error("Unexpected request: " + url);
+  });
+  const focus = ui.find(x => x.tag === "select" &&
+    x.attributes["aria-label"] === "Aba para análise por IA");
+  focus.value = "Overview";
+  await focus.trigger("change");
+  await ui.find(x => x.tag === "button" &&
+    x.textContent === "Buscar amostras no Google (somente leitura)").trigger();
+  assert.equal(requests[0].body.focus_sheet, "Overview");
+  assert.equal(requests[0].body.read_consent, true);
+  const include = ui.find(x => x.tag === "input" && x.type === "checkbox" &&
+    descendants(ui.root).some(p => p.classList.contains("ai-sample-consent") &&
+      descendants(p).includes(x)));
+  assert.equal(include.disabled, false);
+  assert.equal(include.checked, false);
+  await ui.find(x => x.tag === "button" &&
+    x.textContent === "Visualizar pacote para IA").trigger();
+  assert.equal(requests[1].body.formula_samples.length, 0);
+  include.checked = true;
+  await include.trigger("change");
+  await ui.find(x => x.tag === "button" &&
+    x.textContent === "Visualizar pacote para IA").trigger();
+  assert.equal(requests[2].body.formula_samples.length, 1);
+  assert.equal(requests[2].body.formula_samples[0].a1, "C3");
 });

@@ -134,3 +134,15 @@
 .ai-export .ai-action-row{margin-bottom:0}
 .ai-export .ai-action-row button{border:1px solid #487187;background:#1b3d4b}
 .ai-export .ai-action-row button:hover:not(:disabled){background:#265367}
+
+/* Read-only formula samples, opt-in separately from model consent */
+.ai-evidence{border:1px solid #37516a;border-radius:12px;padding:15px;margin-top:18px;background:#0d1c29}
+.ai-evidence>h4{font-size:13px;margin:0 0 7px;color:#e7f2ff}
+.ai-evidence>p{font-size:12px;line-height:1.5;margin:0 0 12px}
+.ai-evidence>button{margin:0 0 10px;font-size:12px}
+.ai-evidence-samples{display:grid;gap:8px;max-width:100%}
+.ai-evidence-samples>p{margin:5px 0}
+.ai-sample-row{display:flex;align-items:flex-start;flex-wrap:wrap;gap:9px;background:#08131e;border:1px solid #2c4155;border-radius:8px;padding:9px;min-width:0}
+.ai-sample-row>strong{font:600 11px ui-monospace,Consolas,monospace;color:#7ceab8}
+.ai-sample-row>code{white-space:pre-wrap;overflow-wrap:anywhere;min-width:0;font:11px/1.5 ui-monospace,Consolas,monospace;color:#b8d7e5}
+.ai-evidence .ai-sample-consent{margin-top:12px}

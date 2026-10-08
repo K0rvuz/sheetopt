@@ -243,6 +243,28 @@
       "muted"
     ));
     previewStep.append(previewInfo);
+    const evidenceBox = $node("div", null, "ai-evidence");
+    evidenceBox.append($node("h4", "Amostras de fórmulas (opcional)"));
+    evidenceBox.append($node("p",
+      "O SheetOpt pode reler até seis células dos alertas da aba escolhida. " +
+      "Textos, nomes de abas e constantes são ocultados antes da prévia.",
+      "muted"));
+    const sampleButton = addButton(evidenceBox,
+      "Buscar amostras no Google (somente leitura)", () => {}, "secondary");
+    const sampleResult = $node("div", null, "ai-evidence-samples");
+    evidenceBox.append(sampleResult);
+    const sampleLabel = $node("label", null, "ai-checkbox ai-sample-consent");
+    const includeSamples = $node("input");
+    includeSamples.type = "checkbox";
+    includeSamples.disabled = true;
+    const sampleText = $node("span");
+    sampleText.append($node("strong",
+      "Incluir amostras sanitizadas na consulta ao modelo"));
+    sampleText.append($node("small",
+      "Desmarcado por padrão. Confira os exemplos antes de autorizar o envio."));
+    sampleLabel.append(includeSamples, sampleText);
+    evidenceBox.append(sampleLabel);
+    previewStep.append(evidenceBox);
 
     const consentStep = makeStep("3", "Autorizar e gerar",
       "O modelo só será consultado após revisar a prévia e marcar a autorização.");
@@ -290,6 +312,7 @@
     resultArea.setAttribute("aria-live", "polite");
     consentStep.append(resultArea);
 
+    let formulaSamples = [];
     let previewHash = null;
     let approvedPacket = null;
     let previewDestination = "";
@@ -304,7 +327,8 @@
       opportunities: result.aggregation_opportunities || [],
       focus_sheet: focus.value || null,
       investigation: investigation.value,
-      include_identifiers: includeNames.checked
+      include_identifiers: includeNames.checked,
+      formula_samples: includeSamples.checked ? formulaSamples : []
     });
 
     const duration = (seconds) => {
@@ -323,6 +347,8 @@
       includeNames.disabled = active;
       probeButton.disabled = active;
       previewButton.disabled = active;
+      sampleButton.disabled = active;
+      includeSamples.disabled = active || !formulaSamples.length;
       consent.disabled = active || !previewReady;
       runButton.disabled = active || !previewReady || !consent.checked || !previewHash;
       if (timer !== null) {
@@ -363,9 +389,17 @@
         "muted"
       ));
     };
-    focus.addEventListener("change", reset);
+    const clearSampleEvidence = () => {
+      formulaSamples = [];
+      includeSamples.checked = false;
+      includeSamples.disabled = true;
+      sampleResult.replaceChildren();
+      reset();
+    };
+    focus.addEventListener("change", clearSampleEvidence);
     investigation.addEventListener("change", reset);
     includeNames.addEventListener("change", reset);
+    includeSamples.addEventListener("change", reset);
     consent.addEventListener("change", () => {
       runButton.disabled = busy || !previewReady || !consent.checked || !previewHash;
     });
@@ -459,6 +493,46 @@
         showCompletion("Investigação concluída");
       } catch (error) {
         previewInfo.replaceChildren($node("p", error.message, "warning"));
+        progress.hidden = true;
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    sampleButton.addEventListener("click", async () => {
+      if (busy) return;
+      if (!focus.value) {
+        sampleResult.replaceChildren($node("p",
+          "Selecione uma aba antes de buscar fórmulas.", "warning"));
+        return;
+      }
+      clearSampleEvidence();
+      setBusy(true, "Buscando exemplos...", "Lendo somente células indicadas pelos alertas.");
+      try {
+        const data = await post("/v1/ai/formula-samples", {
+          report: result.report,
+          context: result.context,
+          focus_sheet: focus.value,
+          read_consent: true
+        });
+        formulaSamples = (data.examples || []).slice(0, 6).map(item => ({
+          sheet: focus.value, a1: item.a1, formula_template: item.formula_template
+        }));
+        sampleResult.replaceChildren($node("p",
+          formulaSamples.length
+            ? "Exemplos sanitizados. Nada foi enviado à IA."
+            : "Não foram encontradas células elegíveis nos alertas desta aba.",
+          "muted"));
+        for (const item of formulaSamples) {
+          const row = $node("div", null, "ai-sample-row");
+          row.append($node("strong", item.a1),
+            $node("code", item.formula_template));
+          sampleResult.append(row);
+        }
+        includeSamples.disabled = !formulaSamples.length;
+        showCompletion("Amostras disponíveis");
+      } catch (error) {
+        sampleResult.replaceChildren($node("p", error.message, "warning"));
         progress.hidden = true;
       } finally {
         setBusy(false);

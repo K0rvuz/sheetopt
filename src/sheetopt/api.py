@@ -17,6 +17,7 @@ from sheetopt import __version__
 from sheetopt.ai.packet import build_ai_packet
 from sheetopt.ai.provider import infer_suggestions
 from sheetopt.context.engine import build_report_context
+from sheetopt.context.formula_samples import read_formula_examples
 from sheetopt.evidence.trials import list_trials, outcome_summary, record_trial
 from sheetopt.google.auth import credentials_from_info, sheets_service
 from sheetopt.google.oauth import (
@@ -79,6 +80,7 @@ class AIContextRequest(BaseModel):
     focus_sheet: str | None = Field(default=None, max_length=160)
     investigation: Literal["overview", "upstream", "downstream", "hotspots"] = "overview"
     include_identifiers: bool = False
+    formula_samples: list[dict[str, Any]] = Field(default_factory=list, max_length=6)
     consent: bool = False
     preview_hash: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
 
@@ -99,6 +101,7 @@ def _ai_packet(data: AIContextRequest) -> dict[str, Any]:
             focus_sheet=data.focus_sheet,
             include_identifiers=data.include_identifiers,
             investigation=data.investigation,
+            formula_samples=data.formula_samples,
         )
     except (ValueError, TypeError, KeyError, AttributeError) as exc:
         raise HTTPException(
@@ -272,6 +275,74 @@ class KnowledgeSearch(BaseModel):
 @app.post("/v1/knowledge/search", dependencies=[Depends(require_admin)])
 def knowledge_search(payload: KnowledgeSearch) -> dict[str, Any]:
     return {"results": search_knowledge(payload.query)}
+
+
+class FormulaSampleRequest(BaseModel):
+    report: AnalysisReport
+    context: dict[str, Any]
+    focus_sheet: str = Field(min_length=1, max_length=160)
+    read_consent: bool = False
+
+    @model_validator(mode="after")
+    def validate_sample_scope(self) -> FormulaSampleRequest:
+        if len(self.report.model_dump_json()) > 1_200_000:
+            raise ValueError("Diagnostic too large for a targeted formula read.")
+        if not isinstance(self.context.get("sheets"), list):
+            raise ValueError("A complete sheet context is required.")
+        if self.context.get("coverage") != "formula_snapshot":
+            raise ValueError("Read-only formula sampling requires a live diagnostic context.")
+        if self.focus_sheet not in [
+            sh.get("name") for sh in self.context["sheets"][:100]
+            if isinstance(sh, dict)
+        ]:
+            raise ValueError("Selected sheet does not exist in diagnostic context.")
+        return self
+
+
+@app.post("/v1/ai/formula-samples", dependencies=[Depends(require_admin)])
+def read_context_formula_samples(
+    data: FormulaSampleRequest, response: Response,
+) -> dict[str, Any]:
+    """Explicitly authorized Google *read-only* query for ≤6 diagnostic cells.
+
+    All returned formulas are redacted server-side before leaving the server.
+    There is no call to an LLM and no automatic forward to /v1/ai/suggest.
+    """
+    if not data.read_consent:
+        raise HTTPException(status_code=403, detail="Google formula read consent is required.")
+    active = (get_secret("google_auth_mode") or {}).get("mode")
+    service_info = get_secret("google")
+    if active == "oauth":
+        credentials = oauth_credentials()
+    elif service_info:
+        credentials = credentials_from_info(service_info)
+    else:
+        raise HTTPException(status_code=409, detail="Connect Google to inspect formulas.")
+    try:
+        samples = read_formula_examples(
+            sheets_service(credentials), data.report, data.focus_sheet,
+        )
+    except (HttpError, TimeoutError, OSError, RuntimeError, ValueError, KeyError) as exc:
+        logger.warning("Read-only formula sampling failed: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=502, detail="Could not read sample formulas from Google Sheets."
+        ) from exc
+    finally:
+        if active == "oauth":
+            try:
+                persist_oauth_credentials(credentials)
+            except (HTTPException, sqlite3.Error, RuntimeError, ValueError, TypeError, OSError):
+                logger.warning("Could not persist refreshed OAuth after formula read")
+    response.headers["Cache-Control"] = "no-store, private"
+    return {
+        "sheet": data.focus_sheet,
+        "examples": samples["examples"],
+        "candidate_count": samples["candidate_count"],
+        "source": "google_sheets_formula_only",
+        "sent_to_ai": False,
+        "writes_performed": False,
+        "privacy": "Strings, sheet names and unknown identifiers are redacted.",
+    }
 
 
 @app.post("/v1/ai/investigate", dependencies=[Depends(require_admin)])
