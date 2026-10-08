@@ -207,3 +207,49 @@ def test_expired_oauth_state(monkeypatch, tmp_path):
     put_oauth_state("expired", {"client_hash": "x"}, expires=1)
     assert consume_oauth_state("expired") is None
     assert consume_oauth_state("expired") is None
+
+
+def test_analysis_returns_report_when_oauth_token_persistence_fails(
+    monkeypatch, tmp_path, caplog
+):
+    """Copy must not be treated as failed if persisting a refreshed token fails."""
+    client, headers = _setup(monkeypatch, tmp_path)
+    from sheetopt.secrets_store import put_secret
+
+    put_secret("google_auth_mode", {"mode": "oauth"})
+    creds = object()
+    monkeypatch.setattr(api, "oauth_credentials", lambda: creds)
+
+    class FakeReport:
+        findings = []
+
+    def successful_copy(link, google_info, *, credentials, make_clone):
+        assert credentials is creds
+        assert make_clone
+        return {
+            "report": FakeReport(),
+            "clone": {
+                "id": "copy-id",
+                "url": "https://docs.google.com/spreadsheets/d/copy-id/edit",
+            },
+            "status": "cloned_not_optimized",
+            "optimization_count": 0,
+            "merge_available": False,
+        }
+
+    monkeypatch.setattr(api, "inspect_and_clone", successful_copy)
+
+    def broken_persistence(_credentials):
+        raise RuntimeError("secret-containing-internal-failure")
+
+    monkeypatch.setattr(api, "persist_oauth_credentials", broken_persistence)
+    with caplog.at_level("WARNING"):
+        response = client.post(
+            "/v1/workbooks/analyze",
+            json={"spreadsheet_url": "https://docs.google.com/spreadsheets/d/" + "X" * 30 + "/edit"},
+            headers=headers,
+        )
+    assert response.status_code == 200
+    assert response.json()["clone"]["id"] == "copy-id"
+    assert "RuntimeError" in caplog.text
+    assert "secret-containing-internal-failure" not in caplog.text

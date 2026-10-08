@@ -9,8 +9,21 @@ async function request(path, method = "GET", body) {
     body: body ? JSON.stringify(body) : undefined,
     cache: "no-store"
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Falha na requisição.");
+  const contentType = response.headers.get("content-type") || "";
+  const data = contentType.includes("application/json")
+    ? await response.json().catch(() => ({}))
+    : {};
+  if (!response.ok) {
+    const detail = typeof data.detail === "string" ? data.detail : null;
+    const generic = response.status >= 500
+      ? "Falha interna no servidor (HTTP " + response.status +
+        "). Veja os logs com: docker compose logs --tail=100 sheetopt"
+      : "Requisição recusada (HTTP " + response.status + ").";
+    throw new Error(detail && detail !== "Internal Server Error" ? detail : generic);
+  }
+  if (!data || typeof data !== "object" || !Object.keys(data).length) {
+    throw new Error("O servidor respondeu, mas não retornou um relatório JSON válido.");
+  }
   return data;
 }
 async function refresh() {

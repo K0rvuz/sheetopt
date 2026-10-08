@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
@@ -26,6 +27,7 @@ from sheetopt.secrets_store import get_secret, put_secret
 from sheetopt.security import require_admin
 from sheetopt.workflow import inspect_and_clone
 
+logger = logging.getLogger(__name__)
 app = FastAPI(title="SheetOpt", version=__version__)
 _WEB_DIR = Path(__file__).resolve().parent / "web"
 
@@ -201,15 +203,33 @@ def _analyze(request: AnalyzeRequest, *, clone: bool) -> dict[str, Any]:
     else:
         raise HTTPException(status_code=409, detail="Connect Google or configure a Service Account.")
     try:
-        return inspect_and_clone(
+        result = inspect_and_clone(
             request.spreadsheet_url, service_info, credentials=credentials, make_clone=clone
         )
+        # Never include spreadsheet IDs, formulas or tokens in application logs.
+        logger.info(
+            "SheetOpt diagnostic completed: status=%s, findings=%d, cloned=%s",
+            result["status"],
+            len(result["report"].findings),
+            result["clone"] is not None,
+        )
+        return result
     except (HttpError, ValueError, KeyError, RuntimeError) as exc:
         # Do not expose Google API response bodies or credentials to the browser.
+        logger.warning("SheetOpt diagnostic failed: %s", type(exc).__name__)
         raise HTTPException(
             status_code=502,
             detail="Google access failed. Check sharing, Drive quota and API permissions.",
         ) from exc
     finally:
         if active == "oauth":
-            persist_oauth_credentials(credentials)
+            # A token-refresh storage error must not turn a completed Drive copy
+            # and successful diagnostic into an HTTP 500. Keep the last saved
+            # refresh token and ask for reauthorization if it later expires.
+            try:
+                persist_oauth_credentials(credentials)
+            except Exception as exc:
+                logger.warning(
+                    "SheetOpt could not persist refreshed OAuth credentials: %s",
+                    type(exc).__name__,
+                )
